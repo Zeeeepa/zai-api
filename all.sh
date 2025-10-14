@@ -39,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Prompt for credentials if not set
-if [ ! -f .env ] || ! grep -q "QWEN_EMAIL" .env 2>/dev/null; then
+if [ ! -f .env ] || ! grep -q "QWEN_EMAIL" .env 2>/dev/null || ! grep -q "QWEN_PASSWORD" .env 2>/dev/null; then
     echo -e "${YELLOW}⚠️  Qwen credentials not found in .env${NC}"
     echo ""
     read -p "Enter your Qwen email: " QWEN_EMAIL

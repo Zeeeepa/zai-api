@@ -31,11 +31,17 @@ cd "$SCRIPT_DIR"
 # Load environment variables if .env exists
 if [ -f .env ]; then
     echo -e "${YELLOW}📄 Loading existing .env file...${NC}"
-    export $(grep -v '^#' .env | xargs)
+    # Use safe method to preserve special characters in values
+    set -a
+    source .env
+    set +a
 else
     echo -e "${YELLOW}📄 Creating .env from template...${NC}"
     cp env_template.txt .env
-    export $(grep -v '^#' .env | xargs)
+    # Use safe method to preserve special characters in values
+    set -a
+    source .env
+    set +a
 fi
 
 # Check for required credentials
@@ -257,4 +263,3 @@ echo -e "${GREEN}✓ .env file configured${NC}"
 echo ""
 echo -e "${BLUE}Next step: Run ${YELLOW}./start.sh${BLUE} to start the API server${NC}"
 echo ""
-

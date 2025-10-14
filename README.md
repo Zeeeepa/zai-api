@@ -36,6 +36,99 @@
 
 ## 快速开始
 
+### 方式零：自动化脚本（最简单）⚡
+
+使用自动化脚本实现零配置快速部署：
+
+#### 一键完整部署
+
+```bash
+# 设置凭据（首次运行）
+echo "QWEN_EMAIL=your@email.com" >> .env
+echo "QWEN_PASSWORD=yourpassword" >> .env
+
+# 运行完整自动化流程（提取Token → 启动服务器 → 测试API）
+./all.sh
+```
+
+这个脚本将自动完成：
+1. ✅ 使用 Playwright 自动登录 chat.qwen.ai 并提取 JWT Token
+2. ✅ 启动 FastAPI 服务器（端口 8080）
+3. ✅ 发送测试请求验证 API 正常工作
+
+#### 分步运行
+
+如果你想分步控制每个阶段：
+
+```bash
+# 步骤 1: 自动提取 Qwen Token
+./setup.sh
+
+# 步骤 2: 启动 API 服务器
+./start.sh
+
+# 步骤 3: 测试 API
+./send_request.sh
+```
+
+#### 自动化脚本说明
+
+| 脚本 | 功能 | 输出 |
+|------|------|------|
+| `setup.sh` | Playwright 自动登录并提取 Token | 更新 `.env` 中的 `ZAI_TOKEN` |
+| `start.sh` | 启动服务器并健康检查 | 服务器 PID 和端点信息 |
+| `send_request.sh` | 发送 Graph-RAG 测试请求 | API 响应和 Token 使用统计 |
+| `all.sh` | 运行上述三个脚本 | 完整的部署和测试流程 |
+
+#### 依赖要求
+
+自动化脚本需要：
+- Python 3.7+
+- pip (Python 包管理器)
+- Playwright (自动安装)
+- Chromium 浏览器 (自动安装)
+
+所有依赖会在首次运行时自动安装。
+
+#### 故障排除
+
+**Token 提取失败：**
+```bash
+# 检查凭据
+cat .env | grep QWEN_EMAIL
+cat .env | grep QWEN_PASSWORD
+
+# 查看错误截图
+ls -lh *error.png
+
+# 手动重试
+./setup.sh
+```
+
+**服务器启动失败：**
+```bash
+# 检查端口占用
+lsof -i :8080
+
+# 查看服务器日志
+tail -f server.log
+
+# 停止旧进程并重启
+kill $(cat server.pid)
+./start.sh
+```
+
+**API 测试失败：**
+```bash
+# 检查服务器状态
+curl http://localhost:8080/health
+
+# 查看完整响应
+cat last_response.json | jq '.'
+```
+
+---
+
 ### 方式一：Docker 部署（推荐）
 
 使用 Docker Compose 快速部署，这是最简单的方式：

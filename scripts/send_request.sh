@@ -1,186 +1,132 @@
 #!/bin/bash
-################################################################################
-# send_request.sh - Test ZAI-API with OpenAI-Compatible Request
-# 
-# This script:
-# 1. Sends an OpenAI-compatible API request
-# 2. Asks "What is Graph-RAG?"
-# 3. Prints the formatted response
-################################################################################
+# Send request script - Use OpenAI Python SDK to send requests
 
 set -e  # Exit on error
 
-# Colors for output
-RED='\033[0;31m'
+# Colors
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║           Testing ZAI-API with OpenAI Request             ║${NC}"
-echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
-echo ""
+echo "================================================================"
+echo -e "${BLUE}📤 Sending Request via OpenAI SDK${NC}"
+echo "================================================================"
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
-# Load environment variables
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+# Load environment
+if [ ! -f .env ]; then
+    echo -e "${RED}❌ .env file not found${NC}"
+    exit 1
 fi
 
-# Set defaults
+source .env
+
+# Configuration
 LISTEN_PORT=${LISTEN_PORT:-8080}
-AUTH_TOKEN=${AUTH_TOKEN:-sk-123456}
-API_URL="http://localhost:$LISTEN_PORT"
+BASE_URL="http://localhost:${LISTEN_PORT}/v1"
+API_KEY=${AUTH_TOKEN:-"sk-123456"}
+
+# Get question from argument or use default
+QUESTION=${1:-"What is Graph-Sitter?"}
+
+echo -e "${BLUE}Configuration:${NC}"
+echo "  Base URL: ${BASE_URL}"
+echo "  Question: ${QUESTION}"
+echo ""
 
 # Check if server is running
-echo -e "${CYAN}🔍 Checking server status...${NC}"
-if ! curl -s "$API_URL/health" > /dev/null 2>&1; then
-    echo -e "${RED}❌ ERROR: Server is not running!${NC}"
-    echo -e "${YELLOW}Please run ./start.sh first${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Server is running${NC}"
-echo ""
-
-# Display request information
-echo -e "${CYAN}📋 Request Configuration:${NC}"
-echo "----------------------------------------"
-echo -e "  ${BLUE}API URL:${NC} $API_URL"
-echo -e "  ${BLUE}Auth Token:${NC} ${AUTH_TOKEN:0:10}..."
-echo -e "  ${BLUE}Model:${NC} GLM-4.5"
-echo -e "  ${BLUE}Question:${NC} What is Graph-RAG?"
-echo "----------------------------------------"
-echo ""
-
-# Create request payload
-REQUEST_PAYLOAD='{
-  "model": "GLM-4.5",
-  "messages": [
-    {
-      "role": "user",
-      "content": "What is Graph-RAG? Please provide a comprehensive explanation in 3-4 paragraphs."
-    }
-  ],
-  "stream": false,
-  "temperature": 0.7,
-  "max_tokens": 1000
-}'
-
-# Send request
-echo -e "${MAGENTA}🚀 Sending OpenAI-compatible API request...${NC}"
-echo ""
-
-RESPONSE=$(curl -s -w "\n%{http_code}" "$API_URL/v1/chat/completions" \
-  -H "Authorization: Bearer $AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "$REQUEST_PAYLOAD")
-
-# Extract HTTP status code (last line)
-HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-
-# Check HTTP status
-if [ "$HTTP_CODE" != "200" ]; then
-    echo -e "${RED}❌ ERROR: Request failed with HTTP $HTTP_CODE${NC}"
-    echo -e "${YELLOW}Response:${NC}"
-    echo "$RESPONSE_BODY" | jq . 2>/dev/null || echo "$RESPONSE_BODY"
+if ! curl -s http://localhost:${LISTEN_PORT}/health > /dev/null 2>&1; then
+    echo -e "${RED}❌ Server is not running on port ${LISTEN_PORT}${NC}"
+    echo -e "${YELLOW}💡 Start the server first: ./scripts/start.sh${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Request successful (HTTP $HTTP_CODE)${NC}"
+echo -e "${GREEN}✅ Server is running${NC}"
 echo ""
 
-# Parse and display response
-echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                      API RESPONSE                         ║${NC}"
-echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+# Create Python script to send request
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+RESULT_FILE="test_results/result_${TIMESTAMP}.txt"
+
+echo -e "${BLUE}Sending request using OpenAI SDK...${NC}"
 echo ""
 
-# Extract key information using jq
-if command -v jq &> /dev/null; then
-    # Extract fields
-    RESPONSE_ID=$(echo "$RESPONSE_BODY" | jq -r '.id // "N/A"')
-    MODEL=$(echo "$RESPONSE_BODY" | jq -r '.model // "N/A"')
-    CREATED=$(echo "$RESPONSE_BODY" | jq -r '.created // "N/A"')
-    CONTENT=$(echo "$RESPONSE_BODY" | jq -r '.choices[0].message.content // "No content"')
-    FINISH_REASON=$(echo "$RESPONSE_BODY" | jq -r '.choices[0].finish_reason // "N/A"')
-    PROMPT_TOKENS=$(echo "$RESPONSE_BODY" | jq -r '.usage.prompt_tokens // "N/A"')
-    COMPLETION_TOKENS=$(echo "$RESPONSE_BODY" | jq -r '.usage.completion_tokens // "N/A"')
-    TOTAL_TOKENS=$(echo "$RESPONSE_BODY" | jq -r '.usage.total_tokens // "N/A"')
+# Run Python script with OpenAI SDK
+python3 << EOF
+import openai
+import json
+import sys
+from datetime import datetime
+
+# Initialize OpenAI client pointing to local server
+client = openai.OpenAI(
+    base_url="${BASE_URL}",
+    api_key="${API_KEY}"
+)
+
+try:
+    print("📡 Sending request to ${BASE_URL}/chat/completions")
+    print("")
     
-    # Display metadata
-    echo -e "${CYAN}📊 Response Metadata:${NC}"
-    echo "----------------------------------------"
-    echo -e "  ${BLUE}ID:${NC} $RESPONSE_ID"
-    echo -e "  ${BLUE}Model:${NC} $MODEL"
-    echo -e "  ${BLUE}Created:${NC} $CREATED"
-    echo -e "  ${BLUE}Finish Reason:${NC} $FINISH_REASON"
-    echo "----------------------------------------"
-    echo ""
+    # Send chat completion request
+    response = client.chat.completions.create(
+        model="GLM-4.5",
+        messages=[
+            {"role": "user", "content": "${QUESTION}"}
+        ],
+        stream=False,
+        max_tokens=500
+    )
     
-    # Display token usage
-    echo -e "${CYAN}🔢 Token Usage:${NC}"
-    echo "----------------------------------------"
-    echo -e "  ${BLUE}Prompt Tokens:${NC} $PROMPT_TOKENS"
-    echo -e "  ${BLUE}Completion Tokens:${NC} $COMPLETION_TOKENS"
-    echo -e "  ${BLUE}Total Tokens:${NC} $TOTAL_TOKENS"
-    echo "----------------------------------------"
-    echo ""
+    # Extract response
+    content = response.choices[0].message.content
+    usage = response.usage
     
-    # Display answer
-    echo -e "${GREEN}💬 Answer to \"What is Graph-RAG?\":${NC}"
-    echo "════════════════════════════════════════════════════════════"
-    echo ""
-    echo "$CONTENT" | fold -s -w 60
-    echo ""
-    echo "════════════════════════════════════════════════════════════"
-    echo ""
+    # Print response
+    print("=" * 60)
+    print("✅ RESPONSE RECEIVED")
+    print("=" * 60)
+    print("")
+    print(content)
+    print("")
+    print("=" * 60)
+    print("📊 USAGE STATISTICS")
+    print("=" * 60)
+    print(f"Prompt tokens:     {usage.prompt_tokens}")
+    print(f"Completion tokens: {usage.completion_tokens}")
+    print(f"Total tokens:      {usage.total_tokens}")
+    print("")
     
-    # Save full response
-    echo "$RESPONSE_BODY" | jq . > last_response.json
-    echo -e "${CYAN}💾 Full response saved to: last_response.json${NC}"
+    # Save to file
+    with open("${RESULT_FILE}", "w") as f:
+        f.write("="*60 + "\n")
+        f.write(f"Question: ${QUESTION}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write("="*60 + "\n\n")
+        f.write(content + "\n\n")
+        f.write("="*60 + "\n")
+        f.write(f"Prompt tokens: {usage.prompt_tokens}\n")
+        f.write(f"Completion tokens: {usage.completion_tokens}\n")
+        f.write(f"Total tokens: {usage.total_tokens}\n")
+        f.write("="*60 + "\n")
     
+    print(f"💾 Result saved to: ${RESULT_FILE}")
+    print("")
+    
+except Exception as e:
+    print(f"❌ ERROR: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}================================================================"
+    echo -e "✅ Request Completed Successfully!"
+    echo -e "================================================================${NC}"
 else
-    # Fallback if jq is not available
-    echo -e "${YELLOW}⚠️  jq not installed, showing raw response:${NC}"
-    echo ""
-    echo "$RESPONSE_BODY"
-    echo ""
-    echo "$RESPONSE_BODY" > last_response.json
-    echo -e "${CYAN}💾 Response saved to: last_response.json${NC}"
+    echo -e "${RED}================================================================"
+    echo -e "❌ Request Failed"
+    echo -e "================================================================${NC}"
+    exit 1
 fi
-
-echo ""
-echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║                ✅ REQUEST COMPLETED!                       ║${NC}"
-echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-
-# Additional test suggestions
-echo -e "${CYAN}💡 Try more examples:${NC}"
-echo ""
-echo "  # Streaming response:"
-echo "  curl -N $API_URL/v1/chat/completions \\"
-echo "    -H \"Authorization: Bearer $AUTH_TOKEN\" \\"
-echo "    -H \"Content-Type: application/json\" \\"
-echo "    -d '{\"model\":\"GLM-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Count to 5\"}],\"stream\":true}'"
-echo ""
-echo "  # With function calling:"
-echo "  curl $API_URL/v1/chat/completions \\"
-echo "    -H \"Authorization: Bearer $AUTH_TOKEN\" \\"
-echo "    -H \"Content-Type: application/json\" \\"
-echo "    -d '{\"model\":\"GLM-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the weather in Beijing?\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get weather\"}}]}'"
-echo ""
-echo "  # Different model:"
-echo "  curl $API_URL/v1/chat/completions \\"
-echo "    -H \"Authorization: Bearer $AUTH_TOKEN\" \\"
-echo "    -H \"Content-Type: application/json\" \\"
-echo "    -d '{\"model\":\"GLM-4.6\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello!\"}]}'"
-echo ""
 

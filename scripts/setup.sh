@@ -27,9 +27,12 @@ print_header "🔧 Environment Setup & Validation"
 # PART 1: ENVIRONMENT SETUP
 # ============================================================
 
+# Get repository name
+REPO_NAME=$(basename "$(pwd)")
+
 # Step 1: Check Python
 echo ""
-echo -e "${BLUE}Step 1/6: Checking Python...${NC}"
+echo -e "${BLUE}Step 1/7: Checking Python...${NC}"
 if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version)
     print_status "$GREEN" "✅ Python found: $PYTHON_VERSION"
@@ -38,9 +41,27 @@ else
     exit 1
 fi
 
+# Step 1.5: Create Virtual Environment
+echo ""
+echo -e "${BLUE}Step 1.5/7: Creating virtual environment '${REPO_NAME}'...${NC}"
+if [ ! -d "${REPO_NAME}" ]; then
+    if python3 -m venv "${REPO_NAME}"; then
+        print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' created"
+    else
+        print_status "$RED" "❌ Failed to create virtual environment"
+        exit 1
+    fi
+else
+    print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' already exists"
+fi
+
+# Activate virtual environment
+source "${REPO_NAME}/bin/activate"
+print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' activated"
+
 # Step 2: Setup .env and check for tokens
 echo ""
-echo -e "${BLUE}Step 2/6: Setting up environment and tokens...${NC}"
+echo -e "${BLUE}Step 2/7: Setting up environment and tokens...${NC}"
 
 # Create .env if doesn't exist
 if [ ! -f .env ]; then
@@ -79,7 +100,7 @@ fi
 
 # Step 3: Install Python dependencies
 echo ""
-echo -e "${BLUE}Step 3/6: Installing Python dependencies...${NC}"
+echo -e "${BLUE}Step 3/7: Installing Python dependencies...${NC}"
 if pip3 install -q -r requirements.txt; then
     print_status "$GREEN" "✅ Dependencies installed successfully"
 else
@@ -89,7 +110,7 @@ fi
 
 # Step 4: Verify openai package
 echo ""
-echo -e "${BLUE}Step 4/6: Verifying openai package...${NC}"
+echo -e "${BLUE}Step 4/7: Verifying openai package...${NC}"
 if python3 -c "import openai; print(f'OpenAI SDK version: {openai.__version__}')" 2>&1; then
     print_status "$GREEN" "✅ OpenAI SDK is ready"
 else
@@ -100,7 +121,7 @@ fi
 
 # Step 5: Check configuration
 echo ""
-echo -e "${BLUE}Step 5/6: Checking configuration...${NC}"
+echo -e "${BLUE}Step 5/7: Checking configuration...${NC}"
 source .env
 if [ -n "$AUTH_TOKEN" ] && [ -n "$API_ENDPOINT" ]; then
     print_status "$GREEN" "✅ AUTH_TOKEN configured"
@@ -112,9 +133,28 @@ fi
 
 # Step 6: Create test_results directory
 echo ""
-echo -e "${BLUE}Step 6/6: Creating test_results directory...${NC}"
+echo -e "${BLUE}Step 6/7: Creating test_results directory...${NC}"
 mkdir -p test_results
 print_status "$GREEN" "✅ test_results directory ready"
+
+# Step 7: Set SERVER_PORT
+echo ""
+echo -e "${BLUE}Step 7/7: Configuring SERVER_PORT...${NC}"
+if [ -n "$SERVER_PORT" ]; then
+    # Update LISTEN_PORT in .env if SERVER_PORT is provided
+    if grep -q "^LISTEN_PORT=" .env; then
+        sed -i "s/^LISTEN_PORT=.*/LISTEN_PORT=${SERVER_PORT}/" .env
+    else
+        echo "LISTEN_PORT=${SERVER_PORT}" >> .env
+    fi
+    print_status "$GREEN" "✅ SERVER_PORT set to ${SERVER_PORT}"
+else
+    # Use default 7322 if not provided
+    if ! grep -q "^LISTEN_PORT=" .env; then
+        echo "LISTEN_PORT=7322" >> .env
+    fi
+    print_status "$GREEN" "✅ Using default SERVER_PORT: 7322"
+fi
 
 # ============================================================
 # PART 2: TOKEN VALIDATION (Consolidated from validate_token.sh)

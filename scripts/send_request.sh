@@ -14,6 +14,15 @@ echo "================================================================"
 echo -e "${BLUE}📤 Sending Request via OpenAI SDK${NC}"
 echo "================================================================"
 
+# Get repository name and activate virtual environment
+REPO_NAME=$(basename "$(pwd)")
+if [ -d "${REPO_NAME}" ]; then
+    source "${REPO_NAME}/bin/activate"
+    echo -e "${GREEN}✅ Virtual environment '${REPO_NAME}' activated${NC}"
+else
+    echo -e "${YELLOW}⚠️  Virtual environment '${REPO_NAME}' not found, using system Python${NC}"
+fi
+
 # Load environment
 if [ ! -f .env ]; then
     echo -e "${RED}❌ .env file not found${NC}"
@@ -23,7 +32,7 @@ fi
 source .env
 
 # Configuration
-LISTEN_PORT=${LISTEN_PORT:-8080}
+LISTEN_PORT=${LISTEN_PORT:-7322}
 BASE_URL="http://localhost:${LISTEN_PORT}/v1"
 API_KEY=${AUTH_TOKEN:-"sk-123456"}
 
@@ -123,10 +132,22 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}================================================================"
     echo -e "✅ Request Completed Successfully!"
     echo -e "================================================================${NC}"
+    echo ""
+    echo "SERVER_PORT: ${LISTEN_PORT}"
+    echo ""
+    echo "Available Models:"
+    echo "  - GLM-4.5"
+    echo "  - GLM-4.5-Thinking"
+    echo "  - GLM-4.5-Search"
+    echo "  - GLM-4.5-Air"
+    echo "  - GLM-4.5V"
+    echo "  - GLM-4.6"
+    echo "  - GLM-4.6-Thinking"
+    echo "  - GLM-4.6-Search"
+    echo ""
 else
     echo -e "${RED}================================================================"
     echo -e "❌ Request Failed"
     echo -e "================================================================${NC}"
     exit 1
 fi
-

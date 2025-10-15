@@ -23,8 +23,17 @@ print_status() {
 
 print_header "🚀 Starting OpenAI-Compatible API Server"
 
+# Get repository name and activate virtual environment
+REPO_NAME=$(basename "$(pwd)")
+if [ -d "${REPO_NAME}" ]; then
+    source "${REPO_NAME}/bin/activate"
+    print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' activated"
+else
+    print_status "$YELLOW" "⚠️  Virtual environment '${REPO_NAME}' not found, using system Python"
+fi
+
 # Check if server is already running
-PORT=${LISTEN_PORT:-8080}
+PORT=${LISTEN_PORT:-7322}
 if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     print_status "$YELLOW" "⚠️  Server already running on port $PORT"
     echo ""
@@ -51,7 +60,7 @@ fi
 source .env
 
 # Check configuration
-LISTEN_PORT=${LISTEN_PORT:-8080}
+LISTEN_PORT=${LISTEN_PORT:-7322}
 API_ENDPOINT=${API_ENDPOINT:-"https://chat.z.ai/api/chat/completions"}
 
 if [ "$SKIP_START" != "true" ]; then
@@ -203,6 +212,7 @@ print_header "🎉 Server Started & Health Checks Complete!"
 echo ""
 echo "Server Information:"
 echo "  • URL:              http://localhost:${LISTEN_PORT}"
+echo "  • SERVER_PORT:      ${LISTEN_PORT}"
 echo "  • Health Check:     http://localhost:${LISTEN_PORT}/health"
 echo "  • Models List:      http://localhost:${LISTEN_PORT}/v1/models"
 echo "  • Chat Completions: http://localhost:${LISTEN_PORT}/v1/chat/completions"
@@ -223,4 +233,13 @@ echo "  • View logs:  tail -f server.log"
 echo "  • Stop:       pkill -f 'python3 main.py'"
 echo "  • Test:       ./scripts/send_request.sh"
 echo ""
-
+echo "Available Models:"
+echo "  - GLM-4.5"
+echo "  - GLM-4.5-Thinking"
+echo "  - GLM-4.5-Search"
+echo "  - GLM-4.5-Air"
+echo "  - GLM-4.5V"
+echo "  - GLM-4.6"
+echo "  - GLM-4.6-Thinking"
+echo "  - GLM-4.6-Search"
+echo ""

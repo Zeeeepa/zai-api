@@ -38,19 +38,34 @@ else
     exit 1
 fi
 
-# Step 2: Create .env if not exists
+# Step 2: Fetch token if EMAIL and PASSWORD are set
 echo ""
-echo -e "${BLUE}Step 2/6: Setting up .env file...${NC}"
-if [ ! -f .env ]; then
-    if [ -f env_template.txt ]; then
-        cp env_template.txt .env
-        print_status "$GREEN" "✅ Created .env from template"
+echo -e "${BLUE}Step 2/6: Fetching authentication token...${NC}"
+
+# Check if EMAIL and PASSWORD are set
+if [ -n "$EMAIL" ] && [ -n "$PASSWORD" ]; then
+    print_status "$BLUE" "📧 EMAIL and PASSWORD detected, fetching token automatically..."
+    
+    # Run token fetch script
+    if bash scripts/fetch_token.sh; then
+        print_status "$GREEN" "✅ Token fetched and saved to .env"
     else
-        print_status "$RED" "❌ env_template.txt not found"
-        exit 1
+        print_status "$YELLOW" "⚠️  Token fetch failed, will use anonymous mode"
     fi
 else
-    print_status "$GREEN" "✅ .env file already exists"
+    # Check if .env exists
+    if [ ! -f .env ]; then
+        print_status "$YELLOW" "⚠️  No EMAIL/PASSWORD provided, creating .env from template..."
+        if [ -f env_template.txt ]; then
+            cp env_template.txt .env
+            print_status "$GREEN" "✅ Created .env from template (will use anonymous tokens)"
+        else
+            print_status "$RED" "❌ env_template.txt not found"
+            exit 1
+        fi
+    else
+        print_status "$GREEN" "✅ .env file already exists"
+    fi
 fi
 
 # Step 3: Install Python dependencies

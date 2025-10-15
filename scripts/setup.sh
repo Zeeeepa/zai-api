@@ -27,8 +27,9 @@ print_header "🔧 Environment Setup & Validation"
 # PART 1: ENVIRONMENT SETUP
 # ============================================================
 
-# Get repository name
-REPO_NAME=$(basename "$(pwd)")
+# Virtual environment configuration
+VENV_PATH=".venv"
+LEGACY_VENV_PATH=$(basename "$(pwd)")  # Old pattern: repo-name/
 
 # Step 1: Check Python
 echo ""
@@ -43,21 +44,52 @@ fi
 
 # Step 1.5: Create Virtual Environment
 echo ""
-echo -e "${BLUE}Step 1.5/7: Creating virtual environment '${REPO_NAME}'...${NC}"
-if [ ! -d "${REPO_NAME}" ]; then
-    if python3 -m venv "${REPO_NAME}"; then
-        print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' created"
+echo -e "${BLUE}Step 1.5/7: Setting up virtual environment...${NC}"
+
+# Check for legacy venv and warn
+if [ -d "${LEGACY_VENV_PATH}/bin" ] && [ -f "${LEGACY_VENV_PATH}/bin/activate" ]; then
+    print_status "$YELLOW" "⚠️  Found legacy virtual environment at '${LEGACY_VENV_PATH}/'"
+    print_status "$YELLOW" "   This script now uses '.venv' for better compatibility"
+    echo ""
+    
+    # Offer migration
+    if [ ! -d "${VENV_PATH}" ]; then
+        read -p "Migrate to new .venv location? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_status "$BLUE" "ℹ️  Moving ${LEGACY_VENV_PATH}/ to ${VENV_PATH}/"
+            mv "${LEGACY_VENV_PATH}" "${VENV_PATH}"
+            print_status "$GREEN" "✅ Migration complete"
+        else
+            print_status "$YELLOW" "⚠️  Keeping legacy location for now (will use it)"
+            VENV_PATH="${LEGACY_VENV_PATH}"
+        fi
+    fi
+fi
+
+# Create venv if it doesn't exist
+if [ ! -d "${VENV_PATH}" ]; then
+    echo -e "${BLUE}Creating virtual environment at '${VENV_PATH}'...${NC}"
+    if python3 -m venv "${VENV_PATH}"; then
+        print_status "$GREEN" "✅ Virtual environment '${VENV_PATH}' created"
     else
         print_status "$RED" "❌ Failed to create virtual environment"
         exit 1
     fi
 else
-    print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' already exists"
+    print_status "$GREEN" "✅ Virtual environment '${VENV_PATH}' already exists"
 fi
 
-# Activate virtual environment
-source "${REPO_NAME}/bin/activate"
-print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' activated"
+# Verify and activate virtual environment
+if [ ! -f "${VENV_PATH}/bin/activate" ]; then
+    print_status "$RED" "❌ Virtual environment is invalid (no activate script)"
+    print_status "$YELLOW" "   Removing and recreating..."
+    rm -rf "${VENV_PATH}"
+    python3 -m venv "${VENV_PATH}"
+fi
+
+source "${VENV_PATH}/bin/activate"
+print_status "$GREEN" "✅ Virtual environment activated"
 
 # Step 2: Setup .env and check for tokens
 echo ""

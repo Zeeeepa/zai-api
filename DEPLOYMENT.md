@@ -33,7 +33,7 @@ bash scripts/all.sh
 ```
 
 This will:
-- ✅ Create virtual environment "{REPO_NAME}" (zai-api)
+- ✅ Create virtual environment (.venv)
 - ✅ Set up environment and validate tokens
 - ✅ Start the OpenAI-compatible API server on port 7322
 - ✅ Display available models and server port
@@ -56,7 +56,7 @@ bash scripts/setup.sh
 ```bash
 bash scripts/start.sh
 ```
-- Activates virtual environment "{REPO_NAME}" (zai-api)
+- Activates virtual environment (.venv)
 - Starts server on port 7322 (configurable via SERVER_PORT env var)
 - Displays server port and available models
 - Performs health checks

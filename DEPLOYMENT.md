@@ -21,8 +21,9 @@ cd zai-api
 ### 3. Set Environment Variables
 
 ```bash
-export ZAI_EMAIL="your-email@example.com"
-export ZAI_PASSWORD="your-password"
+export ZAI_EMAIL="developer@pixelium.uk"
+export ZAI_PASSWORD="developer123?"
+export SERVER_PORT=7322
 ```
 
 ### 4. Run Complete Setup
@@ -32,11 +33,13 @@ bash scripts/all.sh
 ```
 
 This will:
+- ✅ Create virtual environment "{REPO_NAME}" (zai-api)
 - ✅ Set up environment and validate tokens
-- ✅ Start the OpenAI-compatible API server on port 7000
+- ✅ Start the OpenAI-compatible API server on port 7322
+- ✅ Display available models and server port
 - ✅ Run comprehensive API tests
 
-**That's it! Your server is now running on `http://localhost:7000`** 🎯
+**That's it! Your server is now running on `http://localhost:7322`** 🎯
 
 ## 📝 Available Scripts
 
@@ -53,7 +56,9 @@ bash scripts/setup.sh
 ```bash
 bash scripts/start.sh
 ```
-- Starts server on port 7000 (configurable via PORT env var)
+- Activates virtual environment "{REPO_NAME}" (zai-api)
+- Starts server on port 7322 (configurable via SERVER_PORT env var)
+- Displays server port and available models
 - Performs health checks
 - Validates all endpoints
 
@@ -75,17 +80,17 @@ bash scripts/all.sh
 ## 🔧 Configuration
 
 ### Port Configuration
-Default: `7000`
+Default: `7322`
 
 To change:
 ```bash
-export PORT=8080
+export SERVER_PORT=8080
 bash scripts/start.sh
 ```
 
 Or edit `.env`:
 ```
-PORT=8080
+LISTEN_PORT=8080
 ```
 
 ### Model Mapping
@@ -106,7 +111,7 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="sk-any",  # ✅ Any key works!
-    base_url="http://localhost:7000/v1"
+    base_url="http://localhost:7322/v1"
 )
 
 result = client.chat.completions.create(
@@ -120,7 +125,7 @@ print(result.choices[0].message.content)
 ### cURL
 
 ```bash
-curl http://localhost:7000/v1/chat/completions \
+curl http://localhost:7322/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-any" \
   -d '{
@@ -135,9 +140,11 @@ curl http://localhost:7000/v1/chat/completions \
 
 ### Server Startup
 ```
+✅ Virtual environment 'zai-api' activated
 ✅ Server started with PID: 1741
-✅ Server is ready on http://localhost:7000
+✅ Server is ready on http://localhost:7322
 ✅ Health check passed: {"status":"healthy"}
+✅ SERVER_PORT: 7322
 ```
 
 ### API Tests
@@ -146,6 +153,16 @@ curl http://localhost:7000/v1/chat/completions \
 ✅ Complex query test: PASSED
 ✅ Streaming response: PASSED
 ✅ Model mapping: gpt-5 → GLM-4.6 ✅
+
+Available Models:
+  - GLM-4.5
+  - GLM-4.5-Thinking
+  - GLM-4.5-Search
+  - GLM-4.5-Air
+  - GLM-4.5V
+  - GLM-4.6
+  - GLM-4.6-Thinking
+  - GLM-4.6-Search
 ```
 
 ### Example Response
@@ -183,7 +200,12 @@ bash scripts/start.sh
 
 ### Check Health
 ```bash
-curl http://localhost:7000/health
+curl http://localhost:7322/health
+```
+
+### Get Available Models
+```bash
+curl http://localhost:7322/v1/models
 ```
 
 ## 📊 Endpoints
@@ -199,7 +221,8 @@ Required:
 - `ZAI_PASSWORD` - Your Z.AI password
 
 Optional:
-- `PORT` - Server port (default: 7000)
+- `SERVER_PORT` - Server port (default: 7322)
+- `LISTEN_PORT` - Server listen port (default: 7322, same as SERVER_PORT)
 - `ZAI_TOKEN` - Pre-fetched JWT token (auto-fetched if not provided)
 
 ## 🎉 Success Indicators
@@ -212,15 +235,26 @@ When deployment is successful, you'll see:
 ================================================================
 
 ✅ All 7 health checks passed
-✅ Server running on http://localhost:7000
+✅ Server running on http://localhost:7322
+✅ SERVER_PORT: 7322
 ✅ Ready to accept requests
+
+Available Models:
+  - GLM-4.5
+  - GLM-4.5-Thinking
+  - GLM-4.5-Search
+  - GLM-4.5-Air
+  - GLM-4.5V
+  - GLM-4.6
+  - GLM-4.6-Thinking
+  - GLM-4.6-Search
 ```
 
 ## 💡 Troubleshooting
 
 ### Server won't start
-1. Check if port 7000 is already in use: `lsof -i :7000`
-2. Try a different port: `PORT=8080 bash scripts/start.sh`
+1. Check if port 7322 is already in use: `lsof -i :7322`
+2. Try a different port: `SERVER_PORT=8080 bash scripts/start.sh`
 3. Check logs: `tail -f server.log`
 
 ### Authentication errors
@@ -229,7 +263,7 @@ When deployment is successful, you'll see:
 3. Check token validity: `bash scripts/setup.sh`
 
 ### Connection refused
-1. Ensure server is running: `curl http://localhost:7000/health`
+1. Ensure server is running: `curl http://localhost:7322/health`
 2. Check server logs: `tail -f server.log`
 3. Restart server: `bash scripts/start.sh`
 

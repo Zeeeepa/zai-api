@@ -191,3 +191,32 @@ MODEL_MAPPING = {
     settings.GLM_46_SEARCH_MODEL: "GLM-4-6-API-V1",
 }
 
+
+# Default model for unknown model names
+DEFAULT_MODEL = settings.GLM_46_MODEL  # GLM-4.6 as default
+
+# Model name normalization - maps unknown models to default
+def normalize_model_name(model: str) -> str:
+    """
+    Normalize model name to a supported model.
+    
+    If the model is known (in MODEL_MAPPING), return it as-is.
+    If the model is unknown, return the default model (GLM-4.6).
+    
+    This allows maximum compatibility with OpenAI clients that may
+    use arbitrary model names like "gpt-4", "gpt-5", etc.
+    
+    Args:
+        model: Original model name from client
+        
+    Returns:
+        str: Normalized model name (known model or default)
+    """
+    # Check if model is in our known models
+    if model in MODEL_MAPPING:
+        return model
+    
+    # Unknown model - use default
+    from .helpers import info_log
+    info_log(f"[MODEL] Unknown model '{model}', using default: {DEFAULT_MODEL}")
+    return DEFAULT_MODEL

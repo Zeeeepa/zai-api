@@ -1,0 +1,23 @@
+============================================================
+Question: What is Graph-Sitter?
+Timestamp: 2025-10-15T18:09:52.858091
+============================================================
+
+Graph-Sitter is a tool for analyzing code dependencies and relationships in software projects. It's built on top of Tree-sitter, a parser generator tool and incremental parsing library.
+
+Graph-Sitter works by parsing source code using Tree-sitter to generate abstract syntax trees (ASTs), and then analyzing these trees to build a graph representation of the codebase. This graph captures various relationships between code elements such as functions, classes, variables, and modules.
+
+The main purpose of Graph-Sitter is to help developers and maintainers understand complex codebases by visualizing and analyzing code dependencies, which can be useful for tasks like:
+- Impact analysis (understanding what might break if you change a particular piece of code)
+- Identifying circular dependencies
+- Finding unused code
+- Understanding architectural patterns
+- Refactoring support
+
+It's particularly valuable for large codebases where manually tracking all these relationships would be impractical or impossible.
+
+============================================================
+Prompt tokens: 31
+Completion tokens: 188
+Total tokens: 219
+============================================================

@@ -9,7 +9,10 @@ import structlog
 from contextlib import contextmanager
 from functools import wraps
 from typing import Callable, Any, Optional
-from .config import settings
+try:
+    from .config import settings
+except ImportError:
+    from config import settings
 
 
 # 配置structlog

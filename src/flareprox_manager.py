@@ -10,8 +10,14 @@ import random
 import time
 from typing import Dict, List, Optional
 import httpx
-from .config import settings
-from .helpers import info_log, error_log, debug_log
+
+# Support both relative and absolute imports
+try:
+    from .config import settings
+    from .helpers import info_log, error_log, debug_log
+except ImportError:
+    from config import settings
+    from helpers import info_log, error_log, debug_log
 
 
 class FlareProxWorker:
@@ -455,4 +461,3 @@ async def get_flareprox_manager() -> FlareProxManager:
         await _flareprox_manager.initialize()
     
     return _flareprox_manager
-

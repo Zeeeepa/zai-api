@@ -1,101 +1,53 @@
-# Z.AI API 配置
-# 使用时请将此文件复制为 .env
-# cp env_template.txt .env
-
-# ========== 上游API地址配置 ==========
-# 支持单个地址或多个地址（逗号分隔）
-# 单个地址示例:
-# API_ENDPOINT=https://chat.z.ai/api/chat/completions
-# 多个地址示例（负载均衡）:
-# API_ENDPOINT=https://chat.z.ai/api/chat/completions,https://deno.com/api/chat/completions,https://mirror.z.ai/api/chat/completions
-# 也可以在当前目录创建upstreams.txt文件，一行一个地址
-# 系统会自动合并去重环境变量和文件中的地址
+# ================================================================
+# Z.AI API Configuration
+# ================================================================
+# Z.AI API endpoint (can provide multiple comma-separated URLs)
 API_ENDPOINT=https://chat.z.ai/api/chat/completions
 
-# 上游地址策略（仅在配置多个上游地址时生效）
-# round-robin: 轮询策略，每次请求轮流使用不同的上游地址（推荐用于负载均衡）
-# failover: 故障转移策略，优先使用第一个地址，失败时才切换到下一个
-UPSTREAM_STRATEGY=failover
+# Z.AI Token (OPTIONAL - will use anonymous token if not provided)
+# ZAI_TOKEN=your_zai_token_here
 
-# 本地API的访问密钥（用于验证客户端请求）
-AUTH_TOKEN=sk-123456
-
-# Z.AI Token（可选配置，用于访问Z.AI API）
-# 支持多个token，用逗号分隔，例如: token1,token2,token3
-# 也可以在当前目录创建tokens.txt文件，一行一个token
-# 系统会自动合并去重，并在请求失败时切换token
-# 如果不配置ZAI_TOKEN，系统将自动使用匿名Token模式
-ZAI_TOKEN=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijc0MzIzNzQ3LTVhMTAtNDQ3My05ZjhmLTk5YjI2OWUwZDA0ZCIsImVtYWlsIjoib3FjZ3lrNWFodUBkdWNrbWFpbC5zYnMifQ.SJSZxgX4saVleREBpWdV1JIRxd_tJ_6cv3EflJFy8KXTSBSzYXmfVz9RZF5cF78aI3TY54eAONEjYuGbmYNYZQ
-
-# 匿名Token配置（无需Z.AI账号，自动获取临时访客Token）
-# 启用后，当ZAI_TOKEN不可用时，自动获取匿名Token作为保底机制
-ENABLE_GUEST_TOKEN=true
-
-# 匿名Token缓存时间（分钟），建议30分钟以平衡性能和有效性
-GUEST_TOKEN_CACHE_MINUTES=30
-
-# Z.AI认证API端点（一般无需修改）
-ZAI_AUTH_ENDPOINT=https://chat.z.ai/api/v1/auths/
-
-# 服务器配置
-LISTEN_PORT=8080
-
-# 日志级别配置：false（不输出）、info（基本信息）、debug（详细调试信息，包括流式输出）
-LOG_LEVEL=info
-
-
-# 跳过客户端认证（仅开发环境使用）
-SKIP_AUTH_TOKEN=false
-
-# 请求配置
-MAX_RETRIES=3
-
-# Toolify 工具调用功能配置
-# 启用后，API将支持OpenAI兼容的function calling
-ENABLE_TOOLIFY=true
-
-# 自定义工具调用提示词模板（可选），如果不设置，将使用默认模板
-# 模板中必须包含 {tools_list} 和 {trigger_signal} 占位符
-# TOOLIFY_CUSTOM_PROMPT=
-
-# 代理配置（可选）
-# 支持单个代理或多个代理（用逗号分隔）
-# 也可以在当前目录创建 proxys.txt 文件，一行一个代理
-# 系统会自动合并去重环境变量和 proxys.txt 中的代理，并在请求时选择代理
-#
-# 单个代理示例：
-# HTTP_PROXY=http://proxy.example.com:8080
-# HTTPS_PROXY=https://proxy.example.com:8080
-#
-# 多个代理示例（用逗号分隔）：
-# HTTP_PROXY=http://proxy1.example.com:8080,http://proxy2.example.com:8080,http://proxy3.example.com:8080
-# HTTPS_PROXY=https://proxy1.example.com:8080,https://proxy2.example.com:8080
-#
-# proxys.txt 文件格式示例：
-# http://proxy1.example.com:8080
-# http://proxy2.example.com:8080
-# https://proxy3.example.com:8443
-#
-# 如果不需要代理，保持注释状态或留空
-HTTP_PROXY=
-HTTPS_PROXY=
-
-# 代理策略配置（可选，默认为 failover）
-# - failover: 优先使用第一个代理，失败时自动切换到下一个
-# - round-robin: 每次请求轮流使用不同的代理
-# PROXY_STRATEGY=failover
-
-
-
-# ！不优化代码，不要修改以下内容！
-
-# Z.AI 签名密钥（用于API请求签名，默认值：junjie），请勿修改
+# Z.AI Signing Secret
 ZAI_SIGNING_SECRET=junjie
 
-# Z.AI 前端版本号（用于API请求头，默认值：prod-fe-1.0.78）
-ZAI_FE_VERSION=prod-fe-1.0.78
+# ================================================================
+# Server Configuration
+# ================================================================
+# Server listening port
+LISTEN_PORT=8080
 
-# 模型配置
+# API Key for client authentication (OPTIONAL - accepts any key by default)
+# Set to any value you want clients to use
+# AUTH_TOKEN=sk-your-custom-key
+
+# Skip authentication entirely (for testing only)
+SKIP_AUTH_TOKEN=false
+
+# ================================================================
+# FlareProx Configuration (IP Rotation via Cloudflare Workers)
+# ================================================================
+# Enable FlareProx for dynamic IP rotation
+ENABLE_FLAREPROX=false
+
+# Cloudflare API credentials (required if ENABLE_FLAREPROX=true)
+# CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
+# CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+
+# ================================================================
+# Anonymous Token Configuration
+# ================================================================
+# Enable automatic anonymous token acquisition
+ENABLE_GUEST_TOKEN=true
+
+# Token cache duration in minutes
+GUEST_TOKEN_CACHE_MINUTES=30
+
+# Z.AI authentication endpoint
+ZAI_AUTH_ENDPOINT=https://chat.z.ai/api/v1/auths/
+
+# ================================================================
+# Model Configuration
+# ================================================================
 PRIMARY_MODEL=GLM-4.5
 THINKING_MODEL=GLM-4.5-Thinking
 SEARCH_MODEL=GLM-4.5-Search
@@ -105,15 +57,37 @@ GLM_46_MODEL=GLM-4.6
 GLM_46_THINKING_MODEL=GLM-4.6-Thinking
 GLM_46_SEARCH_MODEL=GLM-4.6-Search
 
+# ================================================================
+# Feature Configuration
+# ================================================================
+# Enable tool calling (Function Calling) support
+ENABLE_TOOLIFY=true
 
+# Custom tool calling prompt template (optional)
+# TOOLIFY_CUSTOM_PROMPT=your_custom_prompt_here
 
+# ================================================================
+# Logging Configuration
+# ================================================================
+# Log level: false, info, or debug
+LOG_LEVEL=info
 
-# ============================================================================
-# Cloudflare Workers Configuration (FlareProx Integration)
-# ============================================================================
-# Enable FlareProx for dynamic IP rotation and load balancing
-# Get your API token from: https://dash.cloudflare.com/profile/api-tokens
-# Get your Account ID from: https://dash.cloudflare.com (visible in URL or right sidebar)
-ENABLE_FLAREPROX=false
-CLOUDFLARE_API_TOKEN=your_cloudflare_api_token_here
-CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id_here
+# ================================================================
+# Request Configuration
+# ================================================================
+# Maximum retry attempts for failed requests
+MAX_RETRIES=3
+
+# ================================================================
+# Traditional Proxy Configuration (Optional)
+# ================================================================
+# HTTP/HTTPS proxy (comma-separated for multiple proxies)
+# Note: Not needed if using FlareProx
+# HTTP_PROXY=http://proxy1:port,http://proxy2:port
+# HTTPS_PROXY=http://proxy1:port,http://proxy2:port
+
+# Proxy strategy: failover or round-robin
+PROXY_STRATEGY=failover
+
+# Upstream strategy: failover or round-robin
+UPSTREAM_STRATEGY=round-robin

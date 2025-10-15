@@ -127,6 +127,133 @@ def get_logger(name: str = None):
     return _logger
 
 
+def log_http_request(method: str, url: str, headers: dict, body: Any = None, request_id: str = None) -> None:
+    """
+    记录详细的HTTP请求信息（用于调试405等错误）
+    
+    Args:
+        method: HTTP方法 (GET, POST, etc.)
+        url: 请求URL
+        headers: 请求头字典
+        body: 请求体（将被截断或隐藏敏感信息）
+        request_id: 可选的请求ID用于追踪
+    """
+    import json
+    
+    # 隐藏敏感header
+    safe_headers = headers.copy()
+    sensitive_keys = ['authorization', 'cookie', 'x-auth-token', 'x-api-key']
+    for key in list(safe_headers.keys()):
+        if key.lower() in sensitive_keys:
+            safe_headers[key] = '[REDACTED]'
+    
+    # 截断body（避免日志过大）
+    safe_body = None
+    if body is not None:
+        try:
+            body_str = json.dumps(body) if not isinstance(body, str) else body
+            if len(body_str) > 500:
+                safe_body = body_str[:500] + "... [truncated]"
+            else:
+                safe_body = body_str
+        except:
+            safe_body = str(body)[:500]
+    
+    info_log(
+        "📤 Outgoing HTTP Request",
+        request_id=request_id,
+        method=method,
+        url=url,
+        headers=safe_headers,
+        body_preview=safe_body
+    )
+
+
+def log_http_response(status_code: int, headers: dict, body: Any = None, request_id: str = None, error: bool = False) -> None:
+    """
+    记录详细的HTTP响应信息（用于调试405等错误）
+    
+    Args:
+        status_code: HTTP状态码
+        headers: 响应头字典
+        body: 响应体（将被截断）
+        request_id: 可选的请求ID用于追踪
+        error: 是否为错误响应
+    """
+    # 截断body
+    safe_body = None
+    if body is not None:
+        body_str = body if isinstance(body, str) else str(body)
+        if len(body_str) > 1000:
+            safe_body = body_str[:1000] + "... [truncated]"
+        else:
+            safe_body = body_str
+    
+    log_func = error_log if error or status_code >= 400 else info_log
+    log_func(
+        "📥 HTTP Response Received",
+        request_id=request_id,
+        status_code=status_code,
+        is_error=status_code >= 400,
+        headers=dict(headers) if headers else {},
+        body_preview=safe_body
+    )
+
+
+def validate_http_request(url: str, headers: dict, method: str = "POST") -> list:
+    """
+    验证HTTP请求的URL和headers是否正确（用于调试405等错误）
+    
+    Args:
+        url: 请求URL
+        headers: 请求头字典
+        method: HTTP方法
+        
+    Returns:
+        问题列表（空列表表示无问题）
+    """
+    issues = []
+    
+    # 验证URL
+    if not url:
+        issues.append("❌ URL is empty")
+    elif not url.startswith(("http://", "https://")):
+        issues.append(f"❌ URL does not start with http:// or https://: {url}")
+    elif "chat.z.ai" not in url:
+        issues.append(f"⚠️  URL does not contain chat.z.ai: {url}")
+    
+    # 验证HTTP方法
+    if method.upper() != "POST":
+        issues.append(f"❌ HTTP method is not POST: {method}")
+    
+    # 验证必需的headers
+    required_headers = {
+        "content-type": "application/json",
+        "accept": "*/*"
+    }
+    
+    headers_lower = {k.lower(): v for k, v in headers.items()}
+    
+    for req_header, expected_value in required_headers.items():
+        if req_header not in headers_lower:
+            issues.append(f"❌ Missing required header: {req_header}")
+        elif expected_value and expected_value not in headers_lower[req_header].lower():
+            issues.append(f"⚠️  Header {req_header} may have wrong value: {headers_lower[req_header]}")
+    
+    # 检查建议的headers
+    recommended_headers = ["user-agent", "origin", "referer"]
+    for rec_header in recommended_headers:
+        if rec_header not in headers_lower:
+            issues.append(f"⚠️  Missing recommended header: {rec_header}")
+    
+    # 检查可疑的header值
+    for key, value in headers.items():
+        if not value or value.strip() == "":
+            issues.append(f"⚠️  Empty header value for: {key}")
+    
+    return issues
+
+
 # ============================================================================
 # 性能追踪工具
 # ============================================================================
@@ -204,4 +331,3 @@ def perf_track(operation_name: Optional[str] = None, log_result: bool = True, th
         return sync_wrapper
     
     return decorator
-

@@ -13,7 +13,7 @@ from typing import Optional, Dict
 
 from .config import settings, normalize_model_name
 from .schemas import OpenAIRequest, ModelsResponse, Model
-from .helpers import error_log, info_log, debug_log, get_logger, perf_timer
+from .helpers import error_log, info_log, debug_log, get_logger, perf_timer, log_http_request, log_http_response, validate_http_request
 from .zai_transformer import ZAITransformer
 from .toolify_handler import should_enable_toolify, prepare_toolify_request, parse_toolify_response
 from .toolify.detector import StreamingFunctionCallDetector
@@ -538,6 +538,27 @@ async def chat_completions(request: OpenAIRequest, authorization: str = Header(.
                     # 使用转换后的headers（包含Accept-Encoding）
                     headers = transformed["config"]["headers"].copy()
                     
+                    # === Step 1: Detailed request logging (for debugging 405 errors) ===
+                    # === Step 2: Validate request before sending ===
+                    validation_issues = validate_http_request(
+                        url=transformed["config"]["url"],
+                        headers=headers,
+                        method="POST"
+                    )
+                    if validation_issues:
+                        error_log("⚠️  HTTP request validation issues detected:", issues=validation_issues)
+                    else:
+                        info_log("✅ HTTP request validation passed")
+                    
+                    request_id = f"req_{int(time.time() * 1000)}"
+                    log_http_request(
+                        method="POST",
+                        url=transformed["config"]["url"],
+                        headers=headers,
+                        body=transformed["body"],
+                        request_id=request_id
+                    )
+                    
                     request_start_time = time.perf_counter()
                     async with client.stream(
                         "POST",
@@ -546,12 +567,29 @@ async def chat_completions(request: OpenAIRequest, authorization: str = Header(.
                         headers=headers,
                     ) as response:
                         # 记录首字节时间（TTFB）
+                        
+                        # === Step 1: Log response details ===
+                        log_http_response(
+                            status_code=response.status_code,
+                            headers=dict(response.headers),
+                            request_id=request_id,
+                            error=(response.status_code != 200)
+                        )
                         ttfb = (time.perf_counter() - request_start_time) * 1000
                         debug_log(f"⏱️ 上游TTFB (首字节时间)", ttfb_ms=f"{ttfb:.2f}ms")
                         # 检查响应状态码
                         if response.status_code != 200:
                             error_text = await response.aread()
                             error_msg = error_text.decode('utf-8', errors='ignore')
+                            
+                            # === Step 1: Log full error response body for debugging ===
+                            log_http_response(
+                                status_code=response.status_code,
+                                headers=dict(response.headers),
+                                body=error_msg,  # Full error message
+                                request_id=request_id,
+                                error=True
+                            )
                             error_log(
                                 "上游返回错误",
                                 status_code=response.status_code,

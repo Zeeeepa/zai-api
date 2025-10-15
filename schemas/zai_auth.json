@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Z.AI Authentication Schema",
+  "description": "JWT token and signature authentication for Z.AI web interface",
+  "definitions": {
+    "JWTPayload": {
+      "type": "object",
+      "description": "Decoded JWT token payload",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "User ID (primary field)"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Alternative user ID field"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Alternative UID field"
+        },
+        "sub": {
+          "type": "string",
+          "description": "JWT subject (alternative user ID)"
+        },
+        "exp": {
+          "type": "integer",
+          "description": "Expiration timestamp"
+        },
+        "iat": {
+          "type": "integer",
+          "description": "Issued at timestamp"
+        }
+      }
+    },
+    "SignatureComponents": {
+      "type": "object",
+      "required": ["canonical_string", "window_index", "derived_key", "signature"],
+      "properties": {
+        "canonical_string": {
+          "type": "string",
+          "description": "requestId,<id>,timestamp,<ts>,user_id,<uid>|base64(<msg>)|<ts>",
+          "pattern": "^requestId,.+,timestamp,[0-9]+,user_id,.+\\|.+\\|[0-9]+$"
+        },
+        "window_index": {
+          "type": "integer",
+          "description": "Timestamp divided by 300000 (5-minute windows)"
+        },
+        "derived_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "HMAC-SHA256(secret, window_index)"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "HMAC-SHA256(derived_key, canonical_string)"
+        }
+      }
+    },
+    "GuestTokenRequest": {
+      "type": "object",
+      "description": "Request for anonymous guest token",
+      "properties": {
+        "grant_type": {
+          "type": "string",
+          "enum": ["anonymous"],
+          "description": "Grant type for guest access"
+        }
+      }
+    },
+    "GuestTokenResponse": {
+      "type": "object",
+      "required": ["access_token", "token_type"],
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "description": "JWT access token"
+        },
+        "token_type": {
+          "type": "string",
+          "enum": ["Bearer"],
+          "description": "Token type"
+        },
+        "expires_in": {
+          "type": "integer",
+          "description": "Token validity in seconds"
+        }
+      }
+    }
+  },
+  "signatureAlgorithm": {
+    "description": "Double HMAC-SHA256 signature generation",
+    "steps": [
+      "1. Extract user_id from JWT token (try: id, user_id, uid, sub)",
+      "2. Build canonical string: requestId,<id>,timestamp,<ts>,user_id,<uid>|base64(<msg>)|<ts>",
+      "3. Calculate window_index = timestamp_ms // 300000",
+      "4. Derive key: derived_key = HMAC-SHA256(secret, window_index)",
+      "5. Generate signature: signature = HMAC-SHA256(derived_key, canonical_string)"
+    ],
+    "secret": {
+      "env_var": "ZAI_SIGNING_SECRET",
+      "default": "junjie"
+    }
+  },
+  "endpoints": {
+    "guest_token": "https://chat.z.ai/api/v1/auths/",
+    "chat": "https://chat.z.ai/api/chat/completions"
+  }
+}
+

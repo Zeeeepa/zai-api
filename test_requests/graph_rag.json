@@ -1,0 +1,13 @@
+{
+  "model": "GLM-4.5",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is Graph-RAG? Please provide a comprehensive explanation including its key components, advantages over traditional RAG, and use cases."
+    }
+  ],
+  "stream": false,
+  "temperature": 0.7,
+  "max_tokens": 2000
+}
+

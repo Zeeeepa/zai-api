@@ -1,0 +1,588 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Z.AI Web Interface Request Schema",
+  "description": "Schema for Z.AI web interface (chat.z.ai) HTTP requests - used for web scraping proxy",
+  "definitions": {
+    "ZAIMessage": {
+      "type": "object",
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"],
+          "description": "Message role (system is converted to user with prefix)"
+        },
+        "content": {
+          "oneOf": [
+            {"type": "string"},
+            {
+              "type": "array",
+              "items": {"$ref": "#/definitions/ContentPart"}
+            }
+          ],
+          "description": "Message content (string or multimodal array)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional message name"
+        }
+      }
+    },
+    "ContentPart": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["text", "image_url"]
+        },
+        "text": {
+          "type": "string",
+          "description": "Text content (if type is text)"
+        },
+        "image_url": {
+          "type": "object",
+          "required": ["url"],
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL or file_id_filename format for GLM-4.5V"
+            }
+          },
+          "description": "Image URL object (if type is image_url)"
+        }
+      }
+    },
+    "FileObject": {
+      "type": "object",
+      "required": ["id", "file"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique file identifier"
+        },
+        "file": {
+          "type": "object",
+          "required": ["id", "filename"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "File ID from upload"
+            },
+            "filename": {
+              "type": "string",
+              "description": "Original filename"
+            },
+            "size": {
+              "type": "integer",
+              "description": "File size in bytes"
+            },
+            "mime_type": {
+              "type": "string",
+              "description": "MIME type"
+            }
+          }
+        }
+      }
+    },
+    "MCPFeature": {
+      "type": "object",
+      "required": ["type", "server", "status"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["mcp"],
+          "description": "Feature type"
+        },
+        "server": {
+          "type": "string",
+          "enum": ["vibe-coding", "ppt-maker", "image-search", "deep-research"],
+          "description": "MCP server name"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["hidden", "visible"],
+          "description": "Feature status"
+        }
+      }
+    },
+    "Features": {
+      "type": "object",
+      "required": ["image_generation", "web_search", "auto_web_search", "preview_mode", "flags", "features", "enable_thinking"],
+      "properties": {
+        "image_generation": {
+          "type": "boolean",
+          "description": "Enable image generation"
+        },
+        "web_search": {
+          "type": "boolean",
+          "description": "Enable web search (controlled via mcp_servers)"
+        },
+        "auto_web_search": {
+          "type": "boolean",
+          "description": "Enable automatic web search"
+        },
+        "preview_mode": {
+          "type": "boolean",
+          "description": "Enable preview mode"
+        },
+        "flags": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Feature flags"
+        },
+        "features": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/MCPFeature"},
+          "description": "Hidden MCP features list"
+        },
+        "enable_thinking": {
+          "type": "boolean",
+          "description": "Enable thinking mode for reasoning"
+        }
+      }
+    },
+    "BackgroundTasks": {
+      "type": "object",
+      "properties": {
+        "title_generation": {
+          "type": "boolean",
+          "description": "Enable automatic title generation"
+        },
+        "tags_generation": {
+          "type": "boolean",
+          "description": "Enable automatic tags generation"
+        }
+      }
+    },
+    "Variables": {
+      "type": "object",
+      "properties": {
+        "{{USER_NAME}}": {
+          "type": "string",
+          "description": "User name variable"
+        },
+        "{{USER_LOCATION}}": {
+          "type": "string",
+          "description": "User location variable"
+        },
+        "{{CURRENT_DATETIME}}": {
+          "type": "string",
+          "description": "Current datetime string"
+        },
+        "{{CURRENT_DATE}}": {
+          "type": "string",
+          "description": "Current date string"
+        },
+        "{{CURRENT_TIME}}": {
+          "type": "string",
+          "description": "Current time string"
+        },
+        "{{CURRENT_WEEKDAY}}": {
+          "type": "string",
+          "description": "Current weekday name"
+        },
+        "{{CURRENT_TIMEZONE}}": {
+          "type": "string",
+          "description": "Current timezone"
+        },
+        "{{USER_LANGUAGE}}": {
+          "type": "string",
+          "description": "User language code"
+        }
+      }
+    },
+    "ModelItem": {
+      "type": "object",
+      "required": ["id", "name", "owned_by"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["0727-360B-API", "0727-106B-API", "glm-4.5v", "GLM-4-6-API-V1"],
+          "description": "Upstream model ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Model display name"
+        },
+        "owned_by": {
+          "type": "string",
+          "description": "Model owner"
+        }
+      }
+    },
+    "RequestBody": {
+      "type": "object",
+      "required": ["stream", "model", "messages", "params", "features", "background_tasks", "mcp_servers", "variables", "model_item", "chat_id", "id"],
+      "properties": {
+        "stream": {
+          "type": "boolean",
+          "description": "Enable streaming response"
+        },
+        "model": {
+          "type": "string",
+          "enum": ["0727-360B-API", "0727-106B-API", "glm-4.5v", "GLM-4-6-API-V1"],
+          "description": "Z.AI model ID"
+        },
+        "messages": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/ZAIMessage"},
+          "minItems": 1,
+          "description": "Conversation messages"
+        },
+        "params": {
+          "type": "object",
+          "description": "Model parameters (empty object in current implementation)"
+        },
+        "features": {
+          "$ref": "#/definitions/Features",
+          "description": "Feature configuration"
+        },
+        "background_tasks": {
+          "$ref": "#/definitions/BackgroundTasks",
+          "description": "Background task configuration"
+        },
+        "mcp_servers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["deep-web-search"]
+          },
+          "description": "MCP servers to enable (e.g., deep-web-search)"
+        },
+        "variables": {
+          "$ref": "#/definitions/Variables",
+          "description": "Template variables for substitution"
+        },
+        "model_item": {
+          "$ref": "#/definitions/ModelItem",
+          "description": "Model metadata"
+        },
+        "chat_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique chat identifier (UUID v4)"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique request identifier (UUID v4)"
+        },
+        "signature_prompt": {
+          "type": "string",
+          "description": "Last user message content (used for signature)"
+        },
+        "files": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/FileObject"},
+          "description": "Uploaded files (for non-vision models with images)"
+        }
+      }
+    },
+    "QueryParams": {
+      "type": "object",
+      "required": ["timestamp", "requestId", "user_id", "version", "platform", "token", "user_agent", "signature_timestamp"],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Unix timestamp in milliseconds"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique request ID (UUID v4)"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "User ID extracted from JWT or guest ID"
+        },
+        "version": {
+          "type": "string",
+          "enum": ["0.0.1"],
+          "description": "API version"
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["web"],
+          "description": "Platform identifier"
+        },
+        "token": {
+          "type": "string",
+          "description": "JWT authentication token"
+        },
+        "user_agent": {
+          "type": "string",
+          "description": "Browser user agent string"
+        },
+        "language": {
+          "type": "string",
+          "description": "User language code"
+        },
+        "languages": {
+          "type": "string",
+          "description": "Accept-Language header value"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "User timezone"
+        },
+        "cookie_enabled": {
+          "type": "string",
+          "enum": ["true", "false"],
+          "description": "Browser cookie support"
+        },
+        "screen_width": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Screen width in pixels"
+        },
+        "screen_height": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Screen height in pixels"
+        },
+        "screen_resolution": {
+          "type": "string",
+          "pattern": "^[0-9]+x[0-9]+$",
+          "description": "Screen resolution"
+        },
+        "viewport_height": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Viewport height"
+        },
+        "viewport_width": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Viewport width"
+        },
+        "viewport_size": {
+          "type": "string",
+          "pattern": "^[0-9]+x[0-9]+$",
+          "description": "Viewport size"
+        },
+        "color_depth": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Color depth in bits"
+        },
+        "pixel_ratio": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.?[0-9]*$",
+          "description": "Device pixel ratio"
+        },
+        "current_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Current page URL"
+        },
+        "pathname": {
+          "type": "string",
+          "description": "URL pathname"
+        },
+        "search": {
+          "type": "string",
+          "description": "URL search string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "URL hash"
+        },
+        "host": {
+          "type": "string",
+          "description": "URL host"
+        },
+        "hostname": {
+          "type": "string",
+          "description": "URL hostname"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["https:"],
+          "description": "URL protocol"
+        },
+        "referrer": {
+          "type": "string",
+          "description": "HTTP Referer"
+        },
+        "title": {
+          "type": "string",
+          "description": "Page title"
+        },
+        "timezone_offset": {
+          "type": "string",
+          "pattern": "^-?[0-9]+$",
+          "description": "Timezone offset in minutes"
+        },
+        "local_time": {
+          "type": "string",
+          "description": "Local timestamp"
+        },
+        "utc_time": {
+          "type": "string",
+          "description": "UTC timestamp"
+        },
+        "is_mobile": {
+          "type": "string",
+          "enum": ["true", "false"],
+          "description": "Is mobile device"
+        },
+        "is_touch": {
+          "type": "string",
+          "enum": ["true", "false"],
+          "description": "Touch support"
+        },
+        "max_touch_points": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Maximum touch points"
+        },
+        "browser_name": {
+          "type": "string",
+          "description": "Browser name"
+        },
+        "os_name": {
+          "type": "string",
+          "description": "Operating system name"
+        },
+        "signature_timestamp": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Signature timestamp (milliseconds)"
+        }
+      }
+    },
+    "Headers": {
+      "type": "object",
+      "required": ["Authorization", "Content-Type", "Accept", "Origin", "Referer", "User-Agent", "X-Fe-Version", "X-Signature"],
+      "properties": {
+        "Authorization": {
+          "type": "string",
+          "pattern": "^Bearer .+$",
+          "description": "JWT token with Bearer prefix"
+        },
+        "Content-Type": {
+          "type": "string",
+          "enum": ["application/json"],
+          "description": "Content type"
+        },
+        "Accept": {
+          "type": "string",
+          "description": "Accept header"
+        },
+        "Origin": {
+          "type": "string",
+          "enum": ["https://chat.z.ai"],
+          "description": "Origin header"
+        },
+        "Referer": {
+          "type": "string",
+          "pattern": "^https://chat\\.z\\.ai(/c/[a-f0-9-]+)?$",
+          "description": "Referer header"
+        },
+        "User-Agent": {
+          "type": "string",
+          "description": "Browser user agent"
+        },
+        "X-Fe-Version": {
+          "type": "string",
+          "description": "Frontend version"
+        },
+        "X-Signature": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Double HMAC-SHA256 signature"
+        },
+        "Cache-Control": {
+          "type": "string",
+          "description": "Cache control"
+        },
+        "Connection": {
+          "type": "string",
+          "enum": ["keep-alive"],
+          "description": "Connection type"
+        },
+        "Accept-Encoding": {
+          "type": "string",
+          "description": "Accepted encodings"
+        },
+        "sec-ch-ua": {
+          "type": "string",
+          "description": "Client hints UA"
+        },
+        "sec-ch-ua-mobile": {
+          "type": "string",
+          "enum": ["?0", "?1"],
+          "description": "Client hints mobile"
+        },
+        "sec-ch-ua-platform": {
+          "type": "string",
+          "description": "Client hints platform"
+        },
+        "Sec-Fetch-Dest": {
+          "type": "string",
+          "enum": ["empty"],
+          "description": "Fetch destination"
+        },
+        "Sec-Fetch-Mode": {
+          "type": "string",
+          "enum": ["cors"],
+          "description": "Fetch mode"
+        },
+        "Sec-Fetch-Site": {
+          "type": "string",
+          "enum": ["same-origin"],
+          "description": "Fetch site"
+        }
+      }
+    },
+    "CompleteRequest": {
+      "type": "object",
+      "required": ["body", "config"],
+      "properties": {
+        "body": {
+          "$ref": "#/definitions/RequestBody",
+          "description": "Request body"
+        },
+        "config": {
+          "type": "object",
+          "required": ["url", "headers"],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Complete URL with query parameters"
+            },
+            "headers": {
+              "$ref": "#/definitions/Headers",
+              "description": "HTTP headers"
+            }
+          }
+        },
+        "token": {
+          "type": "string",
+          "description": "JWT token used for request"
+        }
+      }
+    }
+  },
+  "modelMapping": {
+    "description": "Model mapping from OpenAI names to Z.AI IDs",
+    "mappings": {
+      "GLM-4.5": "0727-360B-API",
+      "GLM-4.5-Thinking": "0727-360B-API",
+      "GLM-4.5-Search": "0727-360B-API",
+      "GLM-4.5-Air": "0727-106B-API",
+      "GLM-4.5V": "glm-4.5v",
+      "GLM-4.6": "GLM-4-6-API-V1",
+      "GLM-4.6-Thinking": "GLM-4-6-API-V1",
+      "GLM-4.6-Search": "GLM-4-6-API-V1"
+    }
+  },
+  "endpoint": {
+    "description": "Z.AI web interface endpoint",
+    "url": "https://chat.z.ai/api/chat/completions"
+  }
+}
+

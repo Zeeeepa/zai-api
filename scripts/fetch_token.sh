@@ -67,8 +67,8 @@ def fetch_token_via_api(email: str, password: str) -> str:
         Exception: If token fetch fails
     """
     
-    # Z.AI authentication endpoint
-    auth_url = "https://chat.z.ai/api/auth/login"
+    # Z.AI authentication endpoint (same as used in token_pool.py)
+    auth_url = "https://chat.z.ai/api/v1/auths/"
     
     # Request headers
     headers = {
@@ -245,4 +245,3 @@ else
     echo -e "${RED}================================================================${NC}"
     exit 1
 fi
-

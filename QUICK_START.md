@@ -1,79 +1,93 @@
-# 🚀 Zero to Started - Automatic Token Fetch
+# 🚀 Quick Start - Get Your Z.AI API Running in 2 Minutes
 
-## **The CORRECT Way - Automatic Token Retrieval**
+## **The Simplest Way - Just Run It!**
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Zeeeepa/zai-api.git
 cd zai-api
 
-# 2. Set your Z.AI credentials (replace with your actual email and password)
-export EMAIL='your@email.com'
-export PASSWORD='your_password'
-
-# 3. Run everything - token will be fetched automatically!
+# 2. Run everything
 bash scripts/all.sh
 ```
 
-**That's it!** The setup script will:
-1. ✅ Automatically fetch your Z.AI token using EMAIL and PASSWORD
-2. ✅ Save it to .env file
+**That's it!** The system will:
+1. ✅ Create .env from template
+2. ✅ Use anonymous/guest tokens automatically (no login needed!)
 3. ✅ Start the OpenAI-compatible API server
 4. ✅ Run a test request to verify everything works
 
 ---
 
-## 📋 Detailed Explanation
+## 🔐 **Want Authenticated Mode? (Optional)**
 
-### **What Happens Behind the Scenes:**
+If you want to use your own Z.AI account instead of guest mode:
 
-1. **setup.sh** detects EMAIL and PASSWORD environment variables
-2. Calls **fetch_token.sh** which:
-   - Logs into Z.AI using your credentials
-   - Retrieves your authentication token
-   - Saves it to .env file as AUTH_TOKEN and ZAI_TOKEN
-3. **start.sh** starts the server using your token
-4. **send_request.sh** tests the server with a question
+### **Step 1: Get Your Token from Browser**
 
----
+1. Open https://chat.z.ai in your browser
+2. Login with your email and password
+3. Open Developer Tools (F12 or Ctrl+Shift+I)
+4. Go to 'Application' tab → 'Local Storage' → 'https://chat.z.ai'
+5. Find 'token' key and copy its value
 
-## 🎯 Three Ways to Run:
-
-### **Method 1: One-Liner (Recommended)**
-```bash
-EMAIL='your@email.com' PASSWORD='your_password' bash scripts/all.sh
+**OR** use this JavaScript in Console:
+```javascript
+localStorage.getItem('token')
 ```
 
-### **Method 2: Export Variables**
+### **Step 2: Save Token**
+
+Run the interactive token setup script:
 ```bash
-export EMAIL='your@email.com'
-export PASSWORD='your_password'
-bash scripts/all.sh
+bash scripts/get_token_from_browser.sh
 ```
 
-### **Method 3: Permanent Configuration**
-```bash
-# Add to your ~/.bashrc or ~/.zshrc
-echo 'export EMAIL="your@email.com"' >> ~/.bashrc
-echo 'export PASSWORD="your_password"' >> ~/.bashrc
-source ~/.bashrc
+It will prompt you to paste your token, then save it to .env automatically!
 
-# Then just run
+### **Step 3: Start Server**
+
+```bash
 bash scripts/all.sh
 ```
 
 ---
 
-## 🔧 Individual Scripts:
+## 📋 **What Happens Behind the Scenes:**
 
-### **Fetch Token Only:**
-```bash
-EMAIL='your@email.com' PASSWORD='your_password' bash scripts/fetch_token.sh
+### **Anonymous Mode (Default):**
 ```
+bash scripts/all.sh
+     ↓
+setup.sh creates .env
+     ↓
+start.sh starts server
+     ↓
+Server automatically fetches guest tokens as needed
+     ↓
+send_request.sh tests the API
+     ↓
+Done! 🎉
+```
+
+### **Authenticated Mode (With Your Token):**
+```
+get_token_from_browser.sh (saves your token)
+     ↓
+bash scripts/all.sh
+     ↓
+Server uses your token for all requests
+     ↓
+Done! 🎉
+```
+
+---
+
+## 🎯 **Individual Scripts:**
 
 ### **Complete Setup:**
 ```bash
-EMAIL='your@email.com' PASSWORD='your_password' bash scripts/setup.sh
+bash scripts/setup.sh
 ```
 
 ### **Start Server:**
@@ -81,27 +95,19 @@ EMAIL='your@email.com' PASSWORD='your_password' bash scripts/setup.sh
 bash scripts/start.sh
 ```
 
-### **Send Request:**
+### **Send Test Request:**
 ```bash
 bash scripts/send_request.sh "Your question here"
 ```
 
----
-
-## ⚠️ Fallback: Anonymous Mode
-
-If you don't want to provide EMAIL/PASSWORD, the system automatically uses **anonymous tokens**:
-
+### **Run Everything:**
 ```bash
-# No EMAIL/PASSWORD needed - uses anonymous mode
 bash scripts/all.sh
 ```
 
-**Note:** Anonymous mode has some limitations compared to authenticated mode.
-
 ---
 
-## 🌟 After Setup - Your Server
+## 🌟 **After Setup - Your Server**
 
 ### **Server Running:**
 ```
@@ -119,7 +125,7 @@ POST http://localhost:8080/v1/chat/completions # Chat
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your_token" \
+  -H "Authorization: Bearer sk-123456" \
   -d '{
     "model": "GLM-4.5",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -132,7 +138,7 @@ import openai
 
 client = openai.OpenAI(
     base_url="http://localhost:8080/v1",
-    api_key="your_token"
+    api_key="sk-123456"  # Any key works
 )
 
 response = client.chat.completions.create(
@@ -145,34 +151,45 @@ print(response.choices[0].message.content)
 
 ---
 
-## 🔐 Security Notes
+## 🔐 **Anonymous vs Authenticated Mode**
 
-1. **Never commit your .env file to git** (already in .gitignore)
-2. **Store credentials securely** - use environment variables
-3. **Use strong passwords**
-4. **Rotate tokens periodically**
+### **Anonymous Mode (Default):**
+✅ **No login required**  
+✅ **Works immediately**  
+✅ **Great for testing**  
+⚠️ **Limited features** - Some advanced features may be restricted
+
+### **Authenticated Mode:**
+✅ **Full features**  
+✅ **Your own account**  
+✅ **No restrictions**  
+⚠️ **Requires manual token copy** - Due to CAPTCHA protection
 
 ---
 
-## 🐛 Troubleshooting
+## 🔧 **Configuration**
 
-### **"EMAIL and PASSWORD environment variables are required"**
+All configuration is in `.env` file:
+
 ```bash
-# Make sure to export them:
-export EMAIL='your@email.com'
-export PASSWORD='your_password'
+# Authentication (optional - uses guest tokens if not set)
+AUTH_TOKEN=your_token_here
+ZAI_TOKEN=your_token_here
+
+# Server settings
+PORT=8080
+API_ENDPOINT=https://chat.z.ai/api/chat/completions
+
+# Features
+ENABLE_GUEST_TOKEN=true
+DEBUG_LOGGING=true
 ```
 
-### **Token Fetch Failed**
-```bash
-# Check your credentials:
-1. Can you login at https://chat.z.ai?
-2. Is your email/password correct?
-3. Try running fetch_token.sh manually to see the error:
-   EMAIL='your@email.com' PASSWORD='your_password' bash scripts/fetch_token.sh
-```
+---
 
-### **Server Won't Start**
+## 🐛 **Troubleshooting**
+
+### **"Server Won't Start"**
 ```bash
 # Check if port 8080 is in use:
 lsof -i :8080
@@ -184,24 +201,43 @@ pkill -f 'python3 main.py'
 bash scripts/start.sh
 ```
 
+### **"Token Not Working"**
+```bash
+# Get a fresh token from browser
+bash scripts/get_token_from_browser.sh
+
+# Or let the system use guest tokens automatically
+# (just remove AUTH_TOKEN from .env)
+```
+
+### **"Connection Refused"**
+```bash
+# Make sure server is running:
+bash scripts/start.sh
+
+# Check server status:
+curl http://localhost:8080/health
+```
+
 ---
 
-## 📊 Expected Output
+## 📊 **Expected Output**
 
 ```
 ================================================================
 🚀 Complete Pipeline Execution
 ================================================================
 
-Step 1/3: Environment Setup & Token Fetch
-📧 EMAIL and PASSWORD detected, fetching token automatically...
-✅ Token fetched and saved to .env
+Step 1/3: Environment Setup & Token Validation
+✅ .env file exists
+✅ Found existing token: eyJhbGciOiJFUzI1NiIs...
 ✅ Dependencies installed
 ✅ Configuration validated
 
 Step 2/3: Start Server & Health Checks
-✅ Server started with PID: xxxx
-✅ All 7 health checks passed
+✅ Server started with PID: 5858
+✅ Server is ready!
+✅ All health checks passed
 
 Step 3/3: Send Test Request
 ✅ Request sent via OpenAI SDK
@@ -212,19 +248,48 @@ Step 3/3: Send Test Request
 
 ---
 
-## 🎉 You're Done!
+## 🎉 **You're Done!**
 
-Your OpenAI-compatible API server is now running with your authenticated Z.AI token!
+Your OpenAI-compatible Z.AI API server is now running!
 
-**No more manual token copying!** 🎊
+### **Anonymous Mode:**
+- ✅ Works immediately
+- ✅ No login needed
+- ✅ Perfect for testing
+
+### **Authenticated Mode:**
+- ✅ Full features
+- ✅ Your own account
+- ✅ See QUICK_START.md for token setup
 
 ---
 
-## 🔗 Links
+## 📚 **Next Steps:**
+
+1. **Read the full README.md** for advanced configuration
+2. **Check out the examples** in tests/ directory
+3. **Integrate with your application** using OpenAI SDK
+4. **Explore tool calling** and other advanced features
+
+---
+
+## 🔗 **Links**
 
 - **GitHub Repository:** https://github.com/Zeeeepa/zai-api
 - **Z.AI Website:** https://chat.z.ai
-- **Documentation:** See README.md for advanced configuration
+- **Documentation:** See README.md for complete docs
+
+---
+
+## 💡 **Why Guest Tokens?**
+
+Z.AI uses CAPTCHA protection for login, which prevents automatic authentication.
+
+**The solution:**
+- **Anonymous mode** - Uses guest tokens automatically (default)
+- **Authenticated mode** - Manually copy token from browser (optional)
+
+Both modes work perfectly! Choose what fits your needs. 🚀
 
 ---
 

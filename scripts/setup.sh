@@ -38,34 +38,43 @@ else
     exit 1
 fi
 
-# Step 2: Fetch token if EMAIL and PASSWORD are set
+# Step 2: Setup .env and check for tokens
 echo ""
-echo -e "${BLUE}Step 2/6: Fetching authentication token...${NC}"
+echo -e "${BLUE}Step 2/6: Setting up environment and tokens...${NC}"
 
-# Check if EMAIL and PASSWORD are set
-if [ -n "$EMAIL" ] && [ -n "$PASSWORD" ]; then
-    print_status "$BLUE" "📧 EMAIL and PASSWORD detected, fetching token automatically..."
-    
-    # Run token fetch script
-    if bash scripts/fetch_token.sh; then
-        print_status "$GREEN" "✅ Token fetched and saved to .env"
+# Create .env if doesn't exist
+if [ ! -f .env ]; then
+    if [ -f env_template.txt ]; then
+        cp env_template.txt .env
+        print_status "$GREEN" "✅ Created .env from template"
     else
-        print_status "$YELLOW" "⚠️  Token fetch failed, will use anonymous mode"
+        print_status "$RED" "❌ env_template.txt not found"
+        exit 1
     fi
 else
-    # Check if .env exists
-    if [ ! -f .env ]; then
-        print_status "$YELLOW" "⚠️  No EMAIL/PASSWORD provided, creating .env from template..."
-        if [ -f env_template.txt ]; then
-            cp env_template.txt .env
-            print_status "$GREEN" "✅ Created .env from template (will use anonymous tokens)"
-        else
-            print_status "$RED" "❌ env_template.txt not found"
-            exit 1
-        fi
-    else
-        print_status "$GREEN" "✅ .env file already exists"
-    fi
+    print_status "$GREEN" "✅ .env file exists"
+fi
+
+# Check if we have a token in .env
+source .env 2>/dev/null || true
+
+if [ -n "$AUTH_TOKEN" ] && [ "$AUTH_TOKEN" != "sk-123456" ]; then
+    # We have a real token configured
+    TOKEN_PREVIEW="${AUTH_TOKEN:0:20}...${AUTH_TOKEN: -10}"
+    print_status "$GREEN" "✅ Found existing token: $TOKEN_PREVIEW"
+elif [ -n "$ZAI_TOKEN" ]; then
+    # We have ZAI_TOKEN
+    TOKEN_PREVIEW="${ZAI_TOKEN:0:20}...${ZAI_TOKEN: -10}"
+    print_status "$GREEN" "✅ Found existing ZAI_TOKEN: $TOKEN_PREVIEW"
+else
+    # No token found
+    print_status "$YELLOW" "⚠️  No authentication token configured"
+    print_status "$YELLOW" "   Server will use anonymous/guest mode"
+    print_status "$BLUE" ""
+    print_status "$BLUE" "   To use authenticated mode:"
+    print_status "$BLUE" "   1. Login at https://chat.z.ai"
+    print_status "$BLUE" "   2. Get token from browser (see QUICK_START.md)"
+    print_status "$BLUE" "   3. Run: bash scripts/get_token_from_browser.sh"
 fi
 
 # Step 3: Install Python dependencies

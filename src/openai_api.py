@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 import httpx
 from typing import Optional, Dict
 
-from .config import settings
+from .config import settings, normalize_model_name
 from .schemas import OpenAIRequest, ModelsResponse, Model
 from .helpers import error_log, info_log, debug_log, get_logger, perf_timer
 from .zai_transformer import ZAITransformer
@@ -444,14 +444,15 @@ async def chat_completions(request: OpenAIRequest, authorization: str = Header(.
     request_client = None
     
     try:
-        # Validate API key
-        if not settings.SKIP_AUTH_TOKEN:
-            if not authorization.startswith("Bearer "):
-                raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-            
-            api_key = authorization[7:]
-            if api_key != settings.AUTH_TOKEN:
-                raise HTTPException(status_code=401, detail="Invalid API key")
+        # Accept ANY API key - server uses its own configured token
+        # This allows maximum compatibility with OpenAI clients
+        info_log("[AUTH] Accepting client API key (server will use configured token)")
+        
+        # Normalize model name - accept ANY model, map to supported ones
+        original_model = request.model
+        request.model = normalize_model_name(original_model)
+        if original_model != request.model:
+            info_log(f"[MODEL] Mapped {original_model} -> {request.model}")
         
         # 获取复用的HTTP客户端和使用的代理URL
         request_client, current_proxy = await get_request_client()

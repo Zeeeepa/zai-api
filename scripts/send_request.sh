@@ -1,6 +1,11 @@
 #!/bin/bash
 # Send request script - Use OpenAI Python SDK to send requests
 
+# Activate venv if it exists
+if [ -d "venv" ]; then
+    source venv/bin/activate
+fi
+
 set -e  # Exit on error
 
 # Colors

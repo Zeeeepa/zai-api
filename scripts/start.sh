@@ -1,6 +1,11 @@
 #!/bin/bash
 # Start script - Start the OpenAI-compatible API server with health checks
 
+# Activate venv if it exists
+if [ -d "venv" ]; then
+    source venv/bin/activate
+fi
+
 set -e  # Exit on error
 
 # Colors

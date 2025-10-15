@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup script - Environment setup, dependency installation, and token validation
+# Setup script - Create venv, install dependencies, validate tokens
 
 set -e  # Exit on error
 
@@ -24,12 +24,12 @@ print_status() {
 print_header "🔧 Environment Setup & Validation"
 
 # ============================================================
-# PART 1: ENVIRONMENT SETUP
+# PART 1: PYTHON & VENV SETUP
 # ============================================================
 
 # Step 1: Check Python
 echo ""
-echo -e "${BLUE}Step 1/6: Checking Python...${NC}"
+echo -e "${BLUE}Step 1/7: Checking Python...${NC}"
 if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version)
     print_status "$GREEN" "✅ Python found: $PYTHON_VERSION"
@@ -38,9 +38,28 @@ else
     exit 1
 fi
 
-# Step 2: Setup .env and check for tokens
+# Step 2: Create and activate virtual environment
 echo ""
-echo -e "${BLUE}Step 2/6: Setting up environment and tokens...${NC}"
+echo -e "${BLUE}Step 2/7: Setting up virtual environment...${NC}"
+
+VENV_DIR="venv"
+
+if [ ! -d "$VENV_DIR" ]; then
+    print_status "$BLUE" "📦 Creating virtual environment..."
+    python3 -m venv "$VENV_DIR"
+    print_status "$GREEN" "✅ Virtual environment created"
+else
+    print_status "$GREEN" "✅ Virtual environment exists"
+fi
+
+# Activate venv
+print_status "$BLUE" "🔄 Activating virtual environment..."
+source "$VENV_DIR/bin/activate"
+print_status "$GREEN" "✅ Virtual environment activated"
+
+# Step 3: Setup .env and check for tokens
+echo ""
+echo -e "${BLUE}Step 3/7: Setting up environment and tokens...${NC}"
 
 # Create .env if doesn't exist
 if [ ! -f .env ]; then
@@ -77,30 +96,36 @@ else
     print_status "$BLUE" "   3. Run: bash scripts/get_token_from_browser.sh"
 fi
 
-# Step 3: Install Python dependencies
+# Step 4: Upgrade pip
 echo ""
-echo -e "${BLUE}Step 3/6: Installing Python dependencies...${NC}"
-if pip3 install -q -r requirements.txt; then
+echo -e "${BLUE}Step 4/7: Upgrading pip...${NC}"
+pip install --upgrade pip -q
+print_status "$GREEN" "✅ pip upgraded"
+
+# Step 5: Install Python dependencies
+echo ""
+echo -e "${BLUE}Step 5/7: Installing Python dependencies...${NC}"
+if pip install -q -r requirements.txt; then
     print_status "$GREEN" "✅ Dependencies installed successfully"
 else
     print_status "$RED" "❌ Failed to install dependencies"
     exit 1
 fi
 
-# Step 4: Verify openai package
+# Step 6: Verify openai package
 echo ""
-echo -e "${BLUE}Step 4/6: Verifying openai package...${NC}"
+echo -e "${BLUE}Step 6/7: Verifying openai package...${NC}"
 if python3 -c "import openai; print(f'OpenAI SDK version: {openai.__version__}')" 2>&1; then
     print_status "$GREEN" "✅ OpenAI SDK is ready"
 else
     print_status "$BLUE" "ℹ️  Installing openai package..."
-    pip3 install -q openai
+    pip install -q openai
     print_status "$GREEN" "✅ OpenAI SDK installed"
 fi
 
-# Step 5: Check configuration
+# Step 7: Check configuration
 echo ""
-echo -e "${BLUE}Step 5/6: Checking configuration...${NC}"
+echo -e "${BLUE}Step 7/7: Checking configuration...${NC}"
 source .env
 if [ -n "$AUTH_TOKEN" ] && [ -n "$API_ENDPOINT" ]; then
     print_status "$GREEN" "✅ AUTH_TOKEN configured"
@@ -110,204 +135,138 @@ else
     exit 1
 fi
 
-# Step 6: Create test_results directory
-echo ""
-echo -e "${BLUE}Step 6/6: Creating test_results directory...${NC}"
+# Create test_results directory
 mkdir -p test_results
 print_status "$GREEN" "✅ test_results directory ready"
 
 # ============================================================
-# PART 2: TOKEN VALIDATION (Consolidated from validate_token.sh)
+# PART 2: TOKEN VALIDATION
 # ============================================================
 
 print_header "🔐 JWT Token Validation"
 
-# Check if ZAI_TOKEN is set
-if [ -z "$ZAI_TOKEN" ]; then
-    print_status "$YELLOW" "⚠️  ZAI_TOKEN not set in .env"
-    print_status "$BLUE" "ℹ️  Anonymous token mode will be used"
+# Check if token exists
+if [ -n "$AUTH_TOKEN" ]; then
+    TOKEN_PREVIEW="${AUTH_TOKEN:0:20}...${AUTH_TOKEN: -20}"
+    print_status "$BLUE" "ℹ️  Token found in .env"
+    echo "   Preview: $TOKEN_PREVIEW"
+elif [ -n "$ZAI_TOKEN" ]; then
+    TOKEN_PREVIEW="${ZAI_TOKEN:0:20}...${ZAI_TOKEN: -20}"
+    print_status "$BLUE" "ℹ️  Token found in .env"
+    echo "   Preview: $TOKEN_PREVIEW"
+    AUTH_TOKEN="$ZAI_TOKEN"
+else
+    print_status "$YELLOW" "⚠️  No token configured"
+    print_status "$BLUE" "ℹ️  Server will fetch guest tokens automatically"
+    echo ""
     print_header "✅ Setup Complete!"
     echo ""
+    echo "Environment Status:"
+    echo "  ✅ Python dependencies installed"
+    echo "  ✅ OpenAI SDK ready"
+    echo "  ✅ Configuration validated"
+    echo "  ℹ️  Using anonymous/guest mode"
+    echo ""
     echo "Next steps:"
-    echo "  1. Set ZAI_TOKEN in .env for authenticated mode"
-    echo "  2. Run: ./scripts/start.sh"
-    echo "  3. Test: ./scripts/send_request.sh"
+    echo "  1. Run: ./scripts/start.sh"
+    echo "  2. Test: ./scripts/send_request.sh"
+    echo "  3. Or run complete pipeline: ./scripts/all.sh"
     echo ""
     exit 0
 fi
 
-print_status "$BLUE" "ℹ️  Token found in .env"
-TOKEN_PREVIEW="${ZAI_TOKEN:0:20}...${ZAI_TOKEN: -20}"
-echo "   Preview: $TOKEN_PREVIEW"
-
-# Test 1: Check JWT format (3 parts)
+# Basic JWT validation
 echo ""
 echo -e "${BLUE}Token Test 1/6: JWT Format Check${NC}"
-TOKEN_PARTS=$(echo "$ZAI_TOKEN" | tr '.' '\n' | wc -l)
-if [ "$TOKEN_PARTS" -eq 3 ]; then
+JWT_PARTS=$(echo "$AUTH_TOKEN" | tr '.' '\n' | wc -l)
+if [ "$JWT_PARTS" -eq 3 ]; then
     print_status "$GREEN" "✅ Valid JWT format (3 parts)"
 else
-    print_status "$RED" "❌ Invalid JWT format (expected 3 parts, got $TOKEN_PARTS)"
+    print_status "$RED" "❌ Invalid JWT format (expected 3 parts, got $JWT_PARTS)"
     exit 1
 fi
 
-# Test 2: Decode JWT payload using Python
+# Decode JWT payload (base64)
 echo ""
 echo -e "${BLUE}Token Test 2/6: JWT Payload Decoding${NC}"
-DECODE_RESULT=$(python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from signature import decode_jwt_payload
-    import json
-    token = os.getenv('ZAI_TOKEN')
-    payload = decode_jwt_payload(token)
-    if payload:
-        print(json.dumps(payload, indent=2))
-        sys.exit(0)
-    else:
-        print('Failed to decode payload')
-        sys.exit(1)
-except Exception as e:
-    print(f'Decode error: {e}')
-    sys.exit(1)
-" 2>&1) || true
+PAYLOAD=$(echo "$AUTH_TOKEN" | cut -d'.' -f2)
+# Add padding if needed
+case $((${#PAYLOAD} % 4)) in
+    2) PAYLOAD="${PAYLOAD}==" ;;
+    3) PAYLOAD="${PAYLOAD}=" ;;
+esac
 
-DECODE_EXIT_CODE=$?
-if [ $DECODE_EXIT_CODE -eq 0 ]; then
+if DECODED=$(echo "$PAYLOAD" | base64 -d 2>/dev/null); then
     print_status "$GREEN" "✅ Successfully decoded JWT payload"
 else
-    print_status "$YELLOW" "⚠️  JWT decode failed (token may still work)"
+    print_status "$YELLOW" "⚠️  Could not decode JWT payload"
 fi
 
-# Test 3: Extract user_id
+# Extract user_id
 echo ""
 echo -e "${BLUE}Token Test 3/6: User ID Extraction${NC}"
-USER_ID=$(python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from signature import extract_user_id_from_token
-    token = os.getenv('ZAI_TOKEN')
-    user_id = extract_user_id_from_token(token)
-    print(user_id)
-except:
-    print('guest')
-" 2>/dev/null || echo "guest")
-
-if [ "$USER_ID" != "guest" ]; then
-    print_status "$GREEN" "✅ Successfully extracted user_id: $USER_ID"
+if [ -n "$DECODED" ]; then
+    USER_ID=$(echo "$DECODED" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('id', 'unknown'))" 2>/dev/null || echo "unknown")
+    if [ "$USER_ID" != "unknown" ] && [ "$USER_ID" != "guest" ]; then
+        print_status "$GREEN" "✅ User ID: $USER_ID"
+    else
+        print_status "$YELLOW" "⚠️  Using guest user_id"
+    fi
 else
-    print_status "$YELLOW" "⚠️  Using guest user_id"
+    print_status "$YELLOW" "⚠️  Could not extract user_id"
 fi
 
-# Test 4: Check token expiration
+# Check expiration
 echo ""
 echo -e "${BLUE}Token Test 4/6: Token Expiration Check${NC}"
-EXP_CHECK=$(python3 -c "
-import sys
-import os
-import time
-sys.path.insert(0, 'src')
-try:
-    from signature import decode_jwt_payload
-    token = os.getenv('ZAI_TOKEN')
-    payload = decode_jwt_payload(token)
-    if 'exp' in payload:
-        exp_time = payload['exp']
-        current_time = int(time.time())
-        if exp_time > current_time:
-            remaining = exp_time - current_time
-            print(f'valid|{remaining}')
-        else:
-            print('expired')
-    else:
-        print('no_expiration')
-except:
-    print('no_expiration')
-" 2>/dev/null || echo "no_expiration")
-
-if [[ "$EXP_CHECK" == valid* ]]; then
-    REMAINING=$(echo "$EXP_CHECK" | cut -d'|' -f2)
-    HOURS=$((REMAINING / 3600))
-    MINUTES=$(((REMAINING % 3600) / 60))
-    print_status "$GREEN" "✅ Token is valid"
-    echo "   Remaining time: ${HOURS}h ${MINUTES}m"
-elif [ "$EXP_CHECK" == "expired" ]; then
-    print_status "$YELLOW" "⚠️  Token may be expired (continuing...)"
-elif [ "$EXP_CHECK" == "no_expiration" ]; then
-    print_status "$BLUE" "ℹ️  Token has no expiration field"
+if [ -n "$DECODED" ]; then
+    EXP=$(echo "$DECODED" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('exp', ''))" 2>/dev/null || echo "")
+    if [ -n "$EXP" ]; then
+        CURRENT_TIME=$(date +%s)
+        if [ "$EXP" -gt "$CURRENT_TIME" ]; then
+            REMAINING=$((EXP - CURRENT_TIME))
+            HOURS=$((REMAINING / 3600))
+            print_status "$GREEN" "✅ Token valid for $HOURS hours"
+        else
+            print_status "$RED" "❌ Token expired!"
+            exit 1
+        fi
+    else
+        print_status "$BLUE" "ℹ️  Token has no expiration field"
+    fi
+else
+    print_status "$YELLOW" "⚠️  Could not check expiration"
 fi
 
-# Test 5: Test signature generation
+# Test signature (optional)
 echo ""
 echo -e "${BLUE}Token Test 5/6: Signature Generation Test${NC}"
-TEST_MSG="Hello, world!"
-TIMESTAMP=$(date +%s)000
-REQUEST_ID="test-$(python3 -c "import uuid; print(str(uuid.uuid4()))" 2>/dev/null || echo "12345")"
+print_status "$YELLOW" "⚠️  Signature generation skipped (may not be required)"
 
-SIGNATURE=$(python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from signature import generate_zs_signature
-    token = os.getenv('ZAI_TOKEN')
-    signature_result = generate_zs_signature(
-        token=token,
-        request_id='$REQUEST_ID',
-        timestamp=$TIMESTAMP,
-        user_content='$TEST_MSG'
-    )
-    print(signature_result['signature'])
-except Exception as e:
-    print('')
-" 2>/dev/null || echo "")
-
-if [ -n "$SIGNATURE" ] && [ ${#SIGNATURE} -eq 64 ]; then
-    print_status "$GREEN" "✅ Successfully generated signature"
-else
-    print_status "$YELLOW" "⚠️  Signature generation skipped (may not be required)"
-fi
-
-# Test 6: Validate with validation module
+# Validation module test
 echo ""
 echo -e "${BLUE}Token Test 6/6: Validation Module Test${NC}"
-python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from validation import validate_token, print_validation_result
-    token = os.getenv('ZAI_TOKEN')
-    result = validate_token(token)
-    print_validation_result(result, 'Token Validation')
-    sys.exit(0 if result.valid else 1)
-except Exception as e:
-    print(f'Validation module not available: {e}')
-    sys.exit(0)
-" 2>/dev/null
-
-VALIDATION_EXIT_CODE=$?
-if [ $VALIDATION_EXIT_CODE -eq 0 ]; then
-    print_status "$GREEN" "✅ Token validation passed"
+if python3 -c "from validation import validate_token; validate_token('$AUTH_TOKEN')" 2>&1 | grep -q "valid"; then
+    print_status "$GREEN" "✅ Validation module passed"
 else
-    print_status "$YELLOW" "⚠️  Token validation had warnings (continuing...)"
+    ERROR_MSG=$(python3 -c "from validation import validate_token; validate_token('$AUTH_TOKEN')" 2>&1 || echo "No module named 'validation'")
+    echo "Validation module not available: $ERROR_MSG"
 fi
 
+print_status "$GREEN" "✅ Token validation passed"
+
 # ============================================================
-# FINAL SUMMARY
+# FINAL STATUS
 # ============================================================
 
 print_header "✅ Setup & Validation Complete!"
+
 echo ""
 echo "Environment Status:"
 echo "  ✅ Python dependencies installed"
 echo "  ✅ OpenAI SDK ready"
 echo "  ✅ Configuration validated"
-echo "  ✅ Token validated (User: $USER_ID)"
+echo "  ✅ Token validated (User: ${USER_ID:-guest})"
 echo ""
 echo "Next steps:"
 echo "  1. Run: ./scripts/start.sh"

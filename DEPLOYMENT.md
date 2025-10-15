@@ -6,14 +6,26 @@ This project has been successfully tested and verified to work with Z.AI service
 
 ## 🚀 Quick Start
 
-### 1. Set Environment Variables
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Zeeeepa/zai-api.git
+```
+
+### 2. Navigate to Project Directory
+
+```bash
+cd zai-api
+```
+
+### 3. Set Environment Variables
 
 ```bash
 export ZAI_EMAIL="your-email@example.com"
 export ZAI_PASSWORD="your-password"
 ```
 
-### 2. Run Complete Setup
+### 4. Run Complete Setup
 
 ```bash
 bash scripts/all.sh
@@ -23,6 +35,8 @@ This will:
 - ✅ Set up environment and validate tokens
 - ✅ Start the OpenAI-compatible API server on port 7000
 - ✅ Run comprehensive API tests
+
+**That's it! Your server is now running on `http://localhost:7000`** 🎯
 
 ## 📝 Available Scripts
 
@@ -222,4 +236,3 @@ When deployment is successful, you'll see:
 ## 🚀 All Systems Go!
 
 This project is **production-ready** and fully tested with Z.AI service! 🎯💯🔥
-

@@ -107,3 +107,13 @@ GLM_46_SEARCH_MODEL=GLM-4.6-Search
 
 
 
+
+# ============================================================================
+# Cloudflare Workers Configuration (FlareProx Integration)
+# ============================================================================
+# Enable FlareProx for dynamic IP rotation and load balancing
+# Get your API token from: https://dash.cloudflare.com/profile/api-tokens
+# Get your Account ID from: https://dash.cloudflare.com (visible in URL or right sidebar)
+ENABLE_FLAREPROX=false
+CLOUDFLARE_API_TOKEN=your_cloudflare_api_token_here
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id_here

@@ -169,6 +169,12 @@ class Settings(BaseSettings):
     # 代理策略：failover（失败切换）或 round-robin（轮询）
     PROXY_STRATEGY: str = os.getenv("PROXY_STRATEGY", "failover").lower()
     
+    # Cloudflare Workers Configuration - FlareProx Integration
+    CLOUDFLARE_API_TOKEN: Optional[str] = os.getenv("CLOUDFLARE_API_TOKEN")
+    CLOUDFLARE_ACCOUNT_ID: Optional[str] = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+    ENABLE_FLAREPROX: bool = os.getenv("ENABLE_FLAREPROX", "false").lower() == "true"
+    
+    
     # Toolify Configuration - 工具调用功能配置
     ENABLE_TOOLIFY: bool = os.getenv("ENABLE_TOOLIFY", "true").lower() == "true"
     TOOLIFY_CUSTOM_PROMPT: Optional[str] = os.getenv("TOOLIFY_CUSTOM_PROMPT")

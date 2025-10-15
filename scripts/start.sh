@@ -23,13 +23,20 @@ print_status() {
 
 print_header "🚀 Starting OpenAI-Compatible API Server"
 
-# Get repository name and activate virtual environment
-REPO_NAME=$(basename "$(pwd)")
-if [ -d "${REPO_NAME}" ]; then
-    source "${REPO_NAME}/bin/activate"
-    print_status "$GREEN" "✅ Virtual environment '${REPO_NAME}' activated"
+# Virtual environment activation with fallback
+VENV_PATH=".venv"
+LEGACY_VENV_PATH=$(basename "$(pwd)")
+
+if [ -f "${VENV_PATH}/bin/activate" ]; then
+    source "${VENV_PATH}/bin/activate"
+    print_status "$GREEN" "✅ Virtual environment activated (${VENV_PATH})"
+elif [ -f "${LEGACY_VENV_PATH}/bin/activate" ]; then
+    source "${LEGACY_VENV_PATH}/bin/activate"
+    print_status "$YELLOW" "⚠️  Using legacy virtual environment (${LEGACY_VENV_PATH}/)"
+    print_status "$YELLOW" "   Consider running: bash scripts/setup.sh to migrate to .venv"
 else
-    print_status "$YELLOW" "⚠️  Virtual environment '${REPO_NAME}' not found, using system Python"
+    print_status "$YELLOW" "⚠️  No virtual environment found, using system Python"
+    print_status "$BLUE" "   To create one, run: bash scripts/setup.sh"
 fi
 
 # Check if server is already running

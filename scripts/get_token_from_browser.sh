@@ -1,5 +1,7 @@
 #!/bin/bash
 # Get Z.AI token from browser - THE CORRECT WAY
+# Note: This script does NOT require virtual environment activation
+# It only needs Python3 (standard library only - no external dependencies)
 
 set -e
 
@@ -114,4 +116,3 @@ else
     echo -e "${RED}❌ Failed to save token${NC}"
     exit 1
 fi
-

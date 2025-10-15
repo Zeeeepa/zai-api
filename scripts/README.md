@@ -42,6 +42,7 @@ Sets up your environment and validates JWT tokens.
 
 **What it does:**
 - ✅ Checks Python installation
+- ✅ Creates virtual environment at `.venv/` (or migrates legacy venv)
 - ✅ Creates/verifies `.env` file
 - ✅ Installs all Python dependencies
 - ✅ Verifies OpenAI SDK installation
@@ -308,4 +309,3 @@ You now have a complete, automated workflow for:
 - All with comprehensive validation and health checks!
 
 **Happy coding!** 🚀
-

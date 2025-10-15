@@ -22,9 +22,12 @@ wheels/
 *.egg
 
 # Virtual Environment
+.venv/
 venv/
 ENV/
 env/
+# Legacy venv pattern (repo-name based)
+zai-api/
 
 # IDE
 .vscode/

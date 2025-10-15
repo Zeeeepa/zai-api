@@ -1,5 +1,7 @@
 #!/bin/bash
 # Automatic Token Fetch Script - Get Z.AI token using EMAIL and PASSWORD
+# Note: This script does NOT require virtual environment activation
+# It only needs Python3 and the 'requests' library (installed system-wide or in active venv)
 
 set -e  # Exit on error
 

@@ -14,13 +14,20 @@ echo "================================================================"
 echo -e "${BLUE}📤 Sending Request via OpenAI SDK${NC}"
 echo "================================================================"
 
-# Get repository name and activate virtual environment
-REPO_NAME=$(basename "$(pwd)")
-if [ -d "${REPO_NAME}" ]; then
-    source "${REPO_NAME}/bin/activate"
-    echo -e "${GREEN}✅ Virtual environment '${REPO_NAME}' activated${NC}"
+# Virtual environment activation with fallback
+VENV_PATH=".venv"
+LEGACY_VENV_PATH=$(basename "$(pwd)")
+
+if [ -f "${VENV_PATH}/bin/activate" ]; then
+    source "${VENV_PATH}/bin/activate"
+    echo -e "${GREEN}✅ Virtual environment activated (${VENV_PATH})${NC}"
+elif [ -f "${LEGACY_VENV_PATH}/bin/activate" ]; then
+    source "${LEGACY_VENV_PATH}/bin/activate"
+    echo -e "${YELLOW}⚠️  Using legacy virtual environment (${LEGACY_VENV_PATH}/)${NC}"
+    echo -e "${YELLOW}   Consider running: bash scripts/setup.sh to migrate to .venv${NC}"
 else
-    echo -e "${YELLOW}⚠️  Virtual environment '${REPO_NAME}' not found, using system Python${NC}"
+    echo -e "${YELLOW}⚠️  No virtual environment found, using system Python${NC}"
+    echo -e "${BLUE}   To create one, run: bash scripts/setup.sh${NC}"
 fi
 
 # Load environment

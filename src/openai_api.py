@@ -17,7 +17,7 @@ from .helpers import error_log, info_log, debug_log, get_logger, perf_timer, log
 from .zai_transformer import ZAITransformer
 from .toolify_handler import should_enable_toolify, prepare_toolify_request, parse_toolify_response
 from .toolify.detector import StreamingFunctionCallDetector
-from .flareprox_manager import flareprox_manager
+from .flareprox_manager import get_flareprox_manager
 from .toolify_config import get_toolify
 
 # 尝试导入orjson（性能优化），如果不可用则fallback到标准json
@@ -210,11 +210,17 @@ async def get_flareprox_worker() -> Optional[str]:
     """
     global _flareprox_worker_index
     
-    # Get healthy workers from FlareProxManager
-    if not flareprox_manager or not flareprox_manager.enabled:
+    # Get FlareProx manager instance
+    try:
+        manager = await get_flareprox_manager()
+        if not manager or not manager.enabled:
+            return None
+    except Exception as e:
+        debug_log(f"[FLAREPROX] Error getting manager: {e}")
         return None
     
-    workers = [w for w in flareprox_manager.workers if w.is_healthy]
+    # Get healthy workers
+    workers = [w for w in manager.workers if w.is_healthy]
     if not workers:
         debug_log("[FLAREPROX] No healthy workers available")
         return None

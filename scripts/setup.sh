@@ -173,6 +173,20 @@ else
     print_status "$GREEN" "✅ OpenAI SDK installed"
 fi
 
+# Step 4.5: Initialize browserforge (download model files)
+echo ""
+echo -e "${BLUE}Step 4.5/7: Initializing browserforge...${NC}"
+if python3 -c "from browserforge.headers import HeaderGenerator; hg = HeaderGenerator()" 2>&1 | grep -q "Downloading"; then
+    print_status "$GREEN" "✅ Browserforge initialized successfully"
+else
+    # Try to import - this will trigger download if needed
+    if python3 -c "from browserforge.headers import HeaderGenerator; HeaderGenerator()" 2>/dev/null; then
+        print_status "$GREEN" "✅ Browserforge ready"
+    else
+        print_status "$YELLOW" "⚠️  Browserforge initialization had warnings (may still work)"
+    fi
+fi
+
 # Step 5: Check configuration
 echo ""
 echo -e "${BLUE}Step 5/7: Checking configuration...${NC}"

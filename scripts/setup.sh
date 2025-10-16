@@ -155,12 +155,34 @@ fi
 echo ""
 echo -e "${BLUE}Step 5/7: Checking configuration...${NC}"
 source .env
-if [ -n "$AUTH_TOKEN" ] && [ -n "$API_ENDPOINT" ]; then
-    print_status "$GREEN" "✅ AUTH_TOKEN configured"
-    print_status "$GREEN" "✅ API_ENDPOINT configured: ${API_ENDPOINT}"
-else
-    print_status "$RED" "❌ Configuration incomplete in .env"
+
+# Check API_ENDPOINT (required)
+if [ -z "$API_ENDPOINT" ]; then
+    print_status "$RED" "❌ API_ENDPOINT not configured in .env"
     exit 1
+fi
+print_status "$GREEN" "✅ API_ENDPOINT configured: ${API_ENDPOINT}"
+
+# Check AUTH_TOKEN (optional)
+if [ -n "$AUTH_TOKEN" ]; then
+    TOKEN_PREVIEW="${AUTH_TOKEN:0:15}...${AUTH_TOKEN: -5}"
+    print_status "$GREEN" "✅ AUTH_TOKEN configured: ${TOKEN_PREVIEW}"
+    print_status "$GREEN" "   Authentication mode: Required"
+else
+    print_status "$YELLOW" "ℹ️  No AUTH_TOKEN configured"
+    print_status "$GREEN" "   Authentication mode: Any key accepted (guest mode)"
+fi
+
+# Check FlareProx configuration
+if [ "$ENABLE_FLAREPROX" = "true" ]; then
+    print_status "$GREEN" "✅ FlareProx enabled"
+    if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+        print_status "$GREEN" "   Cloudflare credentials configured"
+    else
+        print_status "$YELLOW" "   ⚠️  Cloudflare credentials missing (FlareProx will not work)"
+    fi
+else
+    print_status "$BLUE" "ℹ️  FlareProx disabled"
 fi
 
 # Step 6: Create test_results directory

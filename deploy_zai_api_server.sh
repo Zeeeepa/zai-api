@@ -30,7 +30,7 @@ log_warn() {
 export ZAI_EMAIL="${ZAI_EMAIL:-developer@pixelium.uk}"
 export ZAI_PASSWORD="${ZAI_PASSWORD:-developer123?}"
 export SERVER_PORT="${SERVER_PORT:-7322}"
-export ENABLE_FLAREPROX="${ENABLE_FLAREPROX:-false}"
+export ENABLE_FLAREPROX="${ENABLE_FLAREPROX:-true}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
 log_info "Configuration:"

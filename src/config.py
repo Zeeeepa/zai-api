@@ -172,7 +172,7 @@ class Settings(BaseSettings):
     # Cloudflare Workers Configuration - FlareProx Integration
     CLOUDFLARE_API_TOKEN: Optional[str] = os.getenv("CLOUDFLARE_API_TOKEN")
     CLOUDFLARE_ACCOUNT_ID: Optional[str] = os.getenv("CLOUDFLARE_ACCOUNT_ID")
-    ENABLE_FLAREPROX: bool = os.getenv("ENABLE_FLAREPROX", "false").lower() == "true"
+    ENABLE_FLAREPROX: bool = os.getenv("ENABLE_FLAREPROX", "true").lower() == "true"
     
     
     # Toolify Configuration - 工具调用功能配置

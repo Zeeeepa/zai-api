@@ -1224,8 +1224,28 @@ async def chat_completions(request: OpenAIRequest, authorization: str = Header(.
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-def create_openai_response(chat_id: str, model: str, content: str, reasoning_content: str = "", usage: dict = None) -> dict:
-    """创建OpenAI格式的响应对象"""
+def create_openai_response(chat_id: str, model: str, content: str, reasoning_content: str = "", usage: dict = None, proxy_used: str = None) -> dict:
+    """创建OpenAI格式的响应对象
+    
+    Args:
+        chat_id: 会话ID
+        model: 模型名称
+        content: 响应内容
+        reasoning_content: 推理内容（可选）
+        usage: Token使用统计
+        proxy_used: 使用的代理/FlareProx worker URL（可选）
+    """
+    # Add IP validation header if proxy was used
+    if proxy_used:
+        # Extract IP from FlareProx worker URL
+        import re
+        ip_match = re.search(r'https?://([^:/]+)', proxy_used)
+        ip_addr = ip_match.group(1) if ip_match else proxy_used
+        
+        # Prepend validation line to content
+        validation_line = f"✅ Flareproxed Request IP-> '{ip_addr}' ✅ "
+        content = f"{validation_line}\n{content}"
+    
     response = {
         "id": chat_id,
         "object": "chat.completion",
@@ -1569,13 +1589,14 @@ async def handle_non_stream_request(
                     usage=usage_info
                 )
                 
-                # 返回标准OpenAI格式响应
+                # 返回标准OpenAI格式响应（包含IP验证信息）
                 return create_openai_response(
                     transformed["body"]["chat_id"],
                     request.model,
                     final_content,
                     reasoning_content,
-                    usage_info
+                    usage_info,
+                    proxy_used=current_proxy  # Pass FlareProx worker URL for validation
                 )
         
         except HTTPException:

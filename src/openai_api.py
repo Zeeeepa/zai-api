@@ -17,6 +17,7 @@ from .helpers import error_log, info_log, debug_log, get_logger, perf_timer, log
 from .zai_transformer import ZAITransformer
 from .toolify_handler import should_enable_toolify, prepare_toolify_request, parse_toolify_response
 from .toolify.detector import StreamingFunctionCallDetector
+from .flareprox_manager import flareprox_manager
 from .toolify_config import get_toolify
 
 # 尝试导入orjson（性能优化），如果不可用则fallback到标准json
@@ -167,6 +168,10 @@ _proxy_list = []  # 代理列表
 _proxy_index = 0  # 当前代理索引
 _proxy_lock = asyncio.Lock()  # 代理切换锁
 
+# ================== FlareProx Worker Management ==================
+_flareprox_worker_index = 0  # Current FlareProx worker rotation index
+_flareprox_worker_lock = asyncio.Lock()  # FlareProx worker selection lock
+
 def init_proxy_pool():
     """初始化代理池（支持从环境变量和proxys.txt加载）"""
     global _proxy_list
@@ -196,16 +201,54 @@ def init_upstream_pool():
         for i, upstream in enumerate(_upstream_list):
             debug_log(f"  上游 {i+1}: {upstream}")
 
+async def get_flareprox_worker() -> Optional[str]:
+    """
+    Get next healthy FlareProx worker using round-robin strategy.
+    
+    Returns:
+        Optional[str]: FlareProx worker URL, or None if no healthy workers available
+    """
+    global _flareprox_worker_index
+    
+    # Get healthy workers from FlareProxManager
+    if not flareprox_manager or not flareprox_manager.enabled:
+        return None
+    
+    workers = [w for w in flareprox_manager.workers if w.is_healthy]
+    if not workers:
+        debug_log("[FLAREPROX] No healthy workers available")
+        return None
+    
+    # Round-robin selection with thread-safe index management
+    async with _flareprox_worker_lock:
+        worker = workers[_flareprox_worker_index % len(workers)]
+        _flareprox_worker_index += 1
+        info_log(f"[FLAREPROX] Selected worker: {worker.name} ({worker.url})")
+        return worker.url
+
+
 async def get_next_proxy() -> Optional[str]:
     """
     获取下一个代理（根据策略）- 并发安全版本
+    优先使用 FlareProx workers，然后是传统代理，最后是直连
 
     Returns:
         Optional[str]: 代理地址，如果没有可用代理则返回 None
     """
     global _proxy_index
 
+    # PRIORITY 1: Try FlareProx workers first if enabled
+    if settings.ENABLE_FLAREPROX:
+        flareprox_url = await get_flareprox_worker()
+        if flareprox_url:
+            debug_log(f"[PROXY] Using FlareProx worker: {flareprox_url}")
+            return flareprox_url
+        else:
+            debug_log("[PROXY] FlareProx enabled but no healthy workers, falling back to traditional proxies")
+    
+    # PRIORITY 2: Fall back to traditional proxy list
     if not _proxy_list:
+        debug_log("[PROXY] No traditional proxies configured, using direct connection")
         return None
 
     if settings.PROXY_STRATEGY == "round-robin":

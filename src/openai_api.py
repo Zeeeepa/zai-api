@@ -227,8 +227,13 @@ async def get_flareprox_worker() -> Optional[str]:
     
     # Round-robin selection with thread-safe index management
     async with _flareprox_worker_lock:
-        worker = workers[_flareprox_worker_index % len(workers)]
-        _flareprox_worker_index += 1
+        # Ensure index is within bounds before use, then select worker
+        current_index = _flareprox_worker_index % len(workers)
+        worker = workers[current_index]
+    
+        # Update index for the next call
+        _flareprox_worker_index = (current_index + 1)
+    
         info_log(f"[FLAREPROX] Selected worker: {worker.name} ({worker.url})")
         return worker.url
 
@@ -244,13 +249,13 @@ async def get_next_proxy() -> Optional[str]:
     global _proxy_index
 
     # PRIORITY 1: Try FlareProx workers first if enabled
-    if settings.ENABLE_FLAREPROX:
-        flareprox_url = await get_flareprox_worker()
-        if flareprox_url:
-            debug_log(f"[PROXY] Using FlareProx worker: {flareprox_url}")
-            return flareprox_url
-        else:
-            debug_log("[PROXY] FlareProx enabled but no healthy workers, falling back to traditional proxies")
+    # PRIORITY 1: Try FlareProx workers first
+    flareprox_url = await get_flareprox_worker()
+    if flareprox_url:
+        debug_log(f"[PROXY] Using FlareProx worker: {flareprox_url}")
+        return flareprox_url
+    else:
+        debug_log("[PROXY] FlareProx enabled but no healthy workers, falling back to traditional proxies")
     
     # PRIORITY 2: Fall back to traditional proxy list
     if not _proxy_list:

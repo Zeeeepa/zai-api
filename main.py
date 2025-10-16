@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from src.config import settings
 from src.openai_api import router as openai_router
-from src.flareprox_manager import flareprox_manager
+from src.flareprox_manager import get_flareprox_manager
 from src.helpers import info_log, debug_log
 
 @asynccontextmanager
@@ -36,9 +36,9 @@ async def lifespan(app: FastAPI):
         info_log("")
         info_log("🔄 Initializing FlareProx...")
         try:
-            if flareprox_manager.enabled:
-                await flareprox_manager.initialize()
-                stats = flareprox_manager.get_stats()
+            manager = await get_flareprox_manager()
+            if manager and manager.enabled:
+                stats = manager.get_stats()
                 info_log(f"   ✅ FlareProx Ready: {stats['healthy_workers']}/{stats['total_workers']} workers")
             else:
                 info_log("   ⚠️  FlareProx disabled (missing credentials)")
@@ -113,9 +113,11 @@ async def health():
     }
     
     # Add FlareProx stats if enabled
-    if settings.ENABLE_FLAREPROX and flareprox_manager and flareprox_manager.enabled:
+    if settings.ENABLE_FLAREPROX:
         try:
-            stats = flareprox_manager.get_stats()
+            manager = await get_flareprox_manager()
+            if manager and manager.enabled:
+                stats = manager.get_stats()
             health_data["flareprox"] = {
                 "enabled": True,
                 "total_workers": stats["total_workers"],

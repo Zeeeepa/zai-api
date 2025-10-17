@@ -1,252 +1,224 @@
 #!/bin/bash
-# Start script - Start the OpenAI-compatible API server with health checks
+set -e
 
-set -e  # Exit on error
+# =============================================================================
+# ZAI-API Start Script - Start API Server with Health Checks
+# =============================================================================
 
 # Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Helper functions
 print_header() {
-    echo ""
-    echo "================================================================"
+    echo -e "${BLUE}================================================================${NC}"
     echo -e "${BLUE}$1${NC}"
-    echo "================================================================"
+    echo -e "${BLUE}================================================================${NC}"
 }
 
 print_status() {
-    echo -e "${1}${2}${NC}"
+    echo -e "${GREEN}✅ $1${NC}"
 }
 
-print_header "🚀 Starting OpenAI-Compatible API Server"
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# =============================================================================
+# PART 1: ENVIRONMENT ACTIVATION
+# =============================================================================
+
+print_header "Starting ZAI-API Server"
 
 # Virtual environment activation with fallback
 VENV_PATH=".venv"
-LEGACY_VENV_PATH=$(basename "$(pwd)")
+LEGACY_VENV="zai-api"
 
-if [ -f "${VENV_PATH}/bin/activate" ]; then
-    source "${VENV_PATH}/bin/activate"
-    print_status "$GREEN" "✅ Virtual environment activated (${VENV_PATH})"
-elif [ -f "${LEGACY_VENV_PATH}/bin/activate" ]; then
-    source "${LEGACY_VENV_PATH}/bin/activate"
-    print_status "$YELLOW" "⚠️  Using legacy virtual environment (${LEGACY_VENV_PATH}/)"
-    print_status "$YELLOW" "   Consider running: bash scripts/setup.sh to migrate to .venv"
+if [ -f "$VENV_PATH/bin/activate" ]; then
+    source "$VENV_PATH/bin/activate"
+    print_status "Virtual environment activated (.venv)"
+elif [ -f "$LEGACY_VENV/bin/activate" ]; then
+    source "$LEGACY_VENV/bin/activate"
+    print_warning "Using legacy virtual environment ($LEGACY_VENV) - consider migrating to .venv"
 else
-    print_status "$YELLOW" "⚠️  No virtual environment found, using system Python"
-    print_status "$BLUE" "   To create one, run: bash scripts/setup.sh"
+    print_warning "No virtual environment found - using system Python"
+    print_warning "Run 'bash scripts/setup.sh' to create virtual environment"
 fi
+
+# Load environment variables
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
+# Set default port if not configured
+if [ -z "$SERVER_PORT" ]; then
+    export SERVER_PORT="${LISTEN_PORT:-8080}"
+fi
+
+# =============================================================================
+# PART 2: PRE-FLIGHT CHECKS
+# =============================================================================
+
+echo ""
+echo "Pre-flight checks..."
 
 # Check if server is already running
-PORT=${LISTEN_PORT:-7322}
-if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-    print_status "$YELLOW" "⚠️  Server already running on port $PORT"
+if lsof -Pi :$SERVER_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+    PID=$(lsof -Pi :$SERVER_PORT -sTCP:LISTEN -t)
+    print_warning "Server already running on port $SERVER_PORT (PID: $PID)"
     echo ""
-    read -p "Kill existing server and restart? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        pkill -f "python3 main.py" || true
-        print_status "$GREEN" "✅ Killed existing server"
-        sleep 2
-    else
-        print_status "$BLUE" "ℹ️  Using existing server"
-        print_header "✅ Server Already Running"
-        echo "Proceeding to health checks..."
-        SKIP_START=true
-    fi
+    echo "Options:"
+    echo "  1. Kill existing server and restart"
+    echo "  2. Keep existing server running"
+    echo "  3. Exit"
+    echo ""
+    read -p "Choose [1-3]: " choice
+    
+    case $choice in
+        1)
+            kill $PID
+            sleep 2
+            print_status "Existing server stopped"
+            ;;
+        2)
+            print_status "Keeping existing server - checking health..."
+            # Skip to health check section
+            SKIP_START=true
+            ;;
+        *)
+            echo "Exiting..."
+            exit 0
+            ;;
+    esac
 fi
 
-# Load environment
-if [ ! -f .env ]; then
-    print_status "$RED" "❌ .env file not found. Run ./scripts/setup.sh first"
+# Check Python dependencies
+if ! python3 -c "import fastapi, httpx" &> /dev/null; then
+    print_error "Missing Python dependencies"
+    echo "Run: bash scripts/setup.sh"
     exit 1
 fi
 
-source .env
+# Check main.py exists
+if [ ! -f "main.py" ]; then
+    print_error "main.py not found!"
+    exit 1
+fi
 
-# Check configuration
-LISTEN_PORT=${LISTEN_PORT:-7322}
-API_ENDPOINT=${API_ENDPOINT:-"https://chat.z.ai/api/chat/completions"}
+print_status "Pre-flight checks passed"
+
+# =============================================================================
+# PART 3: START SERVER
+# =============================================================================
 
 if [ "$SKIP_START" != "true" ]; then
     echo ""
-    echo -e "${BLUE}Configuration:${NC}"
-    echo "  Listen Port: ${LISTEN_PORT}"
-    echo "  API Endpoint: ${API_ENDPOINT}"
-    echo ""
-
+    print_header "Starting Server"
+    
     # Start server in background
-    echo -e "${BLUE}Starting server...${NC}"
+    echo "Launching server on port $SERVER_PORT..."
     nohup python3 main.py > server.log 2>&1 &
     SERVER_PID=$!
-
-    print_status "$GREEN" "✅ Server started with PID: ${SERVER_PID}"
-
+    
+    # Save PID to file
+    echo $SERVER_PID > .server.pid
+    
+    print_status "Server started with PID: $SERVER_PID"
+    print_status "Logs: server.log"
+    
     # Wait for server to be ready
-    echo -e "${BLUE}Waiting for server to be ready...${NC}"
-    for i in {1..30}; do
-        if curl -s http://localhost:${LISTEN_PORT}/health > /dev/null 2>&1; then
-            print_status "$GREEN" "✅ Server is ready!"
-            break
-        fi
-        if [ $i -eq 30 ]; then
-            print_status "$RED" "❌ Server failed to start. Check server.log"
-            tail -20 server.log
+    echo ""
+    echo "Waiting for server to be ready..."
+    MAX_WAIT=30
+    WAITED=0
+    
+    while ! curl -s http://localhost:$SERVER_PORT/health > /dev/null 2>&1; do
+        if [ $WAITED -ge $MAX_WAIT ]; then
+            print_error "Server failed to start after ${MAX_WAIT}s"
+            echo "Check logs: tail -f server.log"
             exit 1
         fi
+        echo -n "."
         sleep 1
+        WAITED=$((WAITED + 1))
     done
+    
+    echo ""
+    print_status "Server is ready!"
 fi
 
-# ============================================================
-# HEALTH CHECKS (Consolidated from health_check.sh)
-# ============================================================
+# =============================================================================
+# PART 4: HEALTH CHECKS
+# =============================================================================
 
-print_header "🏥 System Health Checks"
-
-BASE_URL="http://localhost:${LISTEN_PORT}"
-
-# Test 1: Check if schemas exist
 echo ""
-echo -e "${BLUE}Health Check 1/7: Schema Files${NC}"
-SCHEMA_FILES=("zai_web_request.json" "zai_web_response.json" "zai_auth.json" "openaiapi.json")
-ALL_SCHEMAS_EXIST=true
+print_header "Health Checks"
 
-for schema in "${SCHEMA_FILES[@]}"; do
-    if [ -f "schemas/$schema" ]; then
-        print_status "$GREEN" "✅ Found: schemas/$schema"
-    else
-        print_status "$YELLOW" "⚠️  Missing: schemas/$schema"
-        ALL_SCHEMAS_EXIST=false
-    fi
-done
-
-# Test 2: Check Python dependencies
-echo ""
-echo -e "${BLUE}Health Check 2/7: Python Dependencies${NC}"
-REQUIRED_DEPS=("fastapi" "httpx" "openai")
-ALL_DEPS_INSTALLED=true
-
-for dep in "${REQUIRED_DEPS[@]}"; do
-    if python3 -c "import $dep" 2>/dev/null; then
-        print_status "$GREEN" "✅ $dep installed"
-    else
-        print_status "$RED" "❌ $dep not installed"
-        ALL_DEPS_INSTALLED=false
-    fi
-done
-
-# Test 3: Server Status
-echo ""
-echo -e "${BLUE}Health Check 3/7: Server Status${NC}"
-if curl -s --connect-timeout 2 "$BASE_URL/health" > /dev/null 2>&1; then
-    print_status "$GREEN" "✅ Server is running on $BASE_URL"
-    HEALTH_RESPONSE=$(curl -s "$BASE_URL/health")
-    echo "   Response: $HEALTH_RESPONSE"
+# Health check endpoint
+HEALTH_RESPONSE=$(curl -s http://localhost:$SERVER_PORT/health)
+if echo "$HEALTH_RESPONSE" | grep -q "healthy"; then
+    print_status "Health check passed"
 else
-    print_status "$RED" "❌ Server health check failed"
+    print_error "Health check failed"
     exit 1
 fi
 
-# Test 4: Models Endpoint
-echo ""
-echo -e "${BLUE}Health Check 4/7: Models Endpoint${NC}"
-MODELS_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/v1/models" -H "Authorization: Bearer ${AUTH_TOKEN:-sk-test}" 2>/dev/null)
-HTTP_CODE=$(echo "$MODELS_RESPONSE" | tail -1)
-MODELS_BODY=$(echo "$MODELS_RESPONSE" | head -n -1)
-
-if [ "$HTTP_CODE" = "200" ]; then
-    print_status "$GREEN" "✅ /v1/models endpoint working"
-    MODEL_COUNT=$(echo "$MODELS_BODY" | python3 -c "import sys, json; print(len(json.load(sys.stdin)['data']))" 2>/dev/null || echo "unknown")
-    echo "   Available models: $MODEL_COUNT"
+# Models endpoint
+MODELS_RESPONSE=$(curl -s http://localhost:$SERVER_PORT/v1/models)
+if echo "$MODELS_RESPONSE" | grep -q "GLM"; then
+    print_status "Models endpoint working"
+    
+    # Extract and display available models
+    echo ""
+    echo "Available Models:"
+    echo "$MODELS_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for model in data.get('data', []):
+        print(f\"  - {model.get('id', 'unknown')}\")
+except:
+    pass
+" 2>/dev/null || echo "  (Could not parse model list)"
 else
-    print_status "$YELLOW" "⚠️  /v1/models returned HTTP $HTTP_CODE"
+    print_warning "Models endpoint returned unexpected response"
 fi
 
-# Test 5: Chat Completions Endpoint
+# =============================================================================
+# SERVER INFO
+# =============================================================================
+
 echo ""
-echo -e "${BLUE}Health Check 5/7: Chat Completions Endpoint${NC}"
-TEST_REQUEST='{
-  "model": "GLM-4.5",
-  "messages": [{"role": "user", "content": "Hi"}],
-  "stream": false,
-  "max_tokens": 5
-}'
-
-CHAT_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/v1/chat/completions" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${AUTH_TOKEN:-sk-test}" \
-    -d "$TEST_REQUEST" 2>/dev/null)
-
-HTTP_CODE=$(echo "$CHAT_RESPONSE" | tail -1)
-
-if [ "$HTTP_CODE" = "200" ]; then
-    print_status "$GREEN" "✅ /v1/chat/completions endpoint working"
-elif [ "$HTTP_CODE" = "401" ]; then
-    print_status "$YELLOW" "⚠️  Authentication required (HTTP 401)"
-    print_status "$BLUE" "ℹ️  Set AUTH_TOKEN in .env"
-else
-    print_status "$YELLOW" "⚠️  Chat completions returned HTTP $HTTP_CODE"
-fi
-
-# Test 6: Token Pool Status
-echo ""
-echo -e "${BLUE}Health Check 6/7: Token Pool Status${NC}"
-if [ -n "$ZAI_TOKEN" ]; then
-    print_status "$GREEN" "✅ ZAI_TOKEN configured"
-    TOKEN_PREVIEW="${ZAI_TOKEN:0:20}..."
-    echo "   Preview: $TOKEN_PREVIEW"
-else
-    print_status "$BLUE" "ℹ️  ZAI_TOKEN not set (anonymous mode)"
-fi
-
-# Test 7: Upstream Connectivity
-echo ""
-echo -e "${BLUE}Health Check 7/7: Upstream Connectivity${NC}"
-if curl -s --connect-timeout 5 "https://chat.z.ai" > /dev/null 2>&1; then
-    print_status "$GREEN" "✅ Can reach chat.z.ai"
-else
-    print_status "$YELLOW" "⚠️  Cannot reach chat.z.ai (may need proxy)"
-fi
-
-# ============================================================
-# FINAL SUMMARY
-# ============================================================
-
-print_header "🎉 Server Started & Health Checks Complete!"
+print_header "🎉 Server Running Successfully!"
 echo ""
 echo "Server Information:"
-echo "  • URL:              http://localhost:${LISTEN_PORT}"
-echo "  • SERVER_PORT:      ${LISTEN_PORT}"
-echo "  • Health Check:     http://localhost:${LISTEN_PORT}/health"
-echo "  • Models List:      http://localhost:${LISTEN_PORT}/v1/models"
-echo "  • Chat Completions: http://localhost:${LISTEN_PORT}/v1/chat/completions"
+echo "  🌐 Base URL: http://localhost:$SERVER_PORT"
+echo "  📡 Health: http://localhost:$SERVER_PORT/health"
+echo "  🤖 Models: http://localhost:$SERVER_PORT/v1/models"
+echo "  💬 Chat: http://localhost:$SERVER_PORT/v1/chat/completions"
 echo ""
-echo "Health Status:"
-if [ "$ALL_SCHEMAS_EXIST" = true ] && [ "$ALL_DEPS_INSTALLED" = true ]; then
-    echo "  ✅ All schemas present"
-    echo "  ✅ All dependencies installed"
-    echo "  ✅ Server endpoints responding"
-    echo "  ✅ System is healthy and ready!"
-else
-    echo "  ⚠️  Some non-critical components missing"
-    echo "  ✅ Server is operational"
-fi
+echo "  📋 PID: $(cat .server.pid 2>/dev/null || echo $SERVER_PID)"
+echo "  📝 Logs: server.log"
 echo ""
-echo "Commands:"
-echo "  • View logs:  tail -f server.log"
-echo "  • Stop:       pkill -f 'python3 main.py'"
-echo "  • Test:       ./scripts/send_request.sh"
+echo "Quick Test:"
+echo '  curl -X POST http://localhost:'$SERVER_PORT'/v1/chat/completions \'
+echo '    -H "Content-Type: application/json" \'
+echo '    -H "Authorization: Bearer sk-any" \'
+echo "    -d '{\"model\": \"GLM-4.6\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}'"
 echo ""
-echo "Available Models:"
-echo "  - GLM-4.5"
-echo "  - GLM-4.5-Thinking"
-echo "  - GLM-4.5-Search"
-echo "  - GLM-4.5-Air"
-echo "  - GLM-4.5V"
-echo "  - GLM-4.6"
-echo "  - GLM-4.6-Thinking"
-echo "  - GLM-4.6-Search"
+echo "Python Test:"
+echo "  bash scripts/send_request.sh"
 echo ""
+echo "Stop Server:"
+echo "  kill \$(cat .server.pid)"
+echo "  # or"
+echo "  pkill -f 'python3 main.py'"
+echo ""
+

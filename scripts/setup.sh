@@ -1,388 +1,299 @@
 #!/bin/bash
-# Setup script - Environment setup, dependency installation, and token validation
+set -e
 
-set -e  # Exit on error
+# =============================================================================
+# ZAI-API Setup Script - Complete Environment Setup
+# =============================================================================
+# This script handles:
+# - Virtual environment creation
+# - Dependency installation
+# - Environment configuration
+# - Token validation
+# - FlareProx integration (optional)
+# =============================================================================
 
 # Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Helper functions
 print_header() {
-    echo ""
-    echo "================================================================"
+    echo -e "${BLUE}================================================================${NC}"
     echo -e "${BLUE}$1${NC}"
-    echo "================================================================"
+    echo -e "${BLUE}================================================================${NC}"
 }
 
 print_status() {
-    echo -e "${1}${2}${NC}"
+    echo -e "${GREEN}✅ $1${NC}"
 }
 
-print_header "🔧 Environment Setup & Validation"
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
 
-# ============================================================
-# PART 1: ENVIRONMENT SETUP
-# ============================================================
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# =============================================================================
+# PART 1: PYTHON & VIRTUAL ENVIRONMENT SETUP
+# =============================================================================
+
+print_header "Step 1: Python & Virtual Environment Setup"
+
+# Check Python availability
+if ! command -v python3 &> /dev/null; then
+    print_error "Python 3 is not installed. Please install Python 3.8+ first."
+    exit 1
+fi
+
+PYTHON_VERSION=$(python3 --version | awk '{print $2}')
+print_status "Python $PYTHON_VERSION found"
 
 # Virtual environment configuration
 VENV_PATH=".venv"
-LEGACY_VENV_PATH=$(basename "$(pwd)")  # Old pattern: repo-name/
+LEGACY_VENV="zai-api"
 
-# Step 1: Check Python
-echo ""
-echo -e "${BLUE}Step 1/7: Checking Python...${NC}"
-if command -v python3 &> /dev/null; then
-    PYTHON_VERSION=$(python3 --version)
-    print_status "$GREEN" "✅ Python found: $PYTHON_VERSION"
+# Check for legacy venv
+if [ -d "$LEGACY_VENV" ] && [ ! -d "$VENV_PATH" ]; then
+    print_warning "Legacy virtual environment detected at '$LEGACY_VENV/'"
+    echo -e "${YELLOW}Would you like to migrate to '.venv/'? (recommended) [Y/n]${NC}"
+    read -r response
+    if [[ ! "$response" =~ ^[Nn]$ ]]; then
+        mv "$LEGACY_VENV" "$VENV_PATH"
+        print_status "Migrated $LEGACY_VENV -> $VENV_PATH"
+    fi
+fi
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "$VENV_PATH" ]; then
+    echo "Creating virtual environment at $VENV_PATH..."
+    python3 -m venv "$VENV_PATH"
+    print_status "Virtual environment created at $VENV_PATH"
 else
-    print_status "$RED" "❌ Python3 not found. Please install Python 3.8+"
+    print_status "Virtual environment already exists at $VENV_PATH"
+fi
+
+# Activate virtual environment
+source "$VENV_PATH/bin/activate"
+print_status "Virtual environment activated"
+
+# =============================================================================
+# PART 2: DEPENDENCY INSTALLATION
+# =============================================================================
+
+print_header "Step 2: Installing Dependencies"
+
+# Upgrade pip
+echo "Upgrading pip..."
+python3 -m pip install --upgrade pip > /dev/null 2>&1
+print_status "pip upgraded"
+
+# Install requirements
+if [ -f "requirements.txt" ]; then
+    echo "Installing Python dependencies..."
+    pip install -r requirements.txt > /dev/null 2>&1
+    print_status "Dependencies installed"
+else
+    print_error "requirements.txt not found!"
     exit 1
 fi
 
-# Step 1.5: Create Virtual Environment
-echo ""
-echo -e "${BLUE}Step 1.5/7: Setting up virtual environment...${NC}"
+# =============================================================================
+# PART 3: ENVIRONMENT CONFIGURATION
+# =============================================================================
 
-# Check for legacy venv and warn
-if [ -d "${LEGACY_VENV_PATH}/bin" ] && [ -f "${LEGACY_VENV_PATH}/bin/activate" ]; then
-    print_status "$YELLOW" "⚠️  Found legacy virtual environment at '${LEGACY_VENV_PATH}/'"
-    print_status "$YELLOW" "   This script now uses '.venv' for better compatibility"
-    echo ""
-    
-    # Offer migration
-    if [ ! -d "${VENV_PATH}" ]; then
-        read -p "Migrate to new .venv location? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_status "$BLUE" "ℹ️  Moving ${LEGACY_VENV_PATH}/ to ${VENV_PATH}/"
-            mv "${LEGACY_VENV_PATH}" "${VENV_PATH}"
-            print_status "$GREEN" "✅ Migration complete"
-        else
-            print_status "$YELLOW" "⚠️  Keeping legacy location for now (will use it)"
-            VENV_PATH="${LEGACY_VENV_PATH}"
-        fi
-    fi
-fi
+print_header "Step 3: Environment Configuration"
 
-# Create venv if it doesn't exist
-if [ ! -d "${VENV_PATH}" ]; then
-    echo -e "${BLUE}Creating virtual environment at '${VENV_PATH}'...${NC}"
-    if python3 -m venv "${VENV_PATH}"; then
-        print_status "$GREEN" "✅ Virtual environment '${VENV_PATH}' created"
-    else
-        print_status "$RED" "❌ Failed to create virtual environment"
-        exit 1
-    fi
-else
-    print_status "$GREEN" "✅ Virtual environment '${VENV_PATH}' already exists"
-fi
-
-# Verify and activate virtual environment
-if [ ! -f "${VENV_PATH}/bin/activate" ]; then
-    print_status "$RED" "❌ Virtual environment is invalid (no activate script)"
-    print_status "$YELLOW" "   Removing and recreating..."
-    rm -rf "${VENV_PATH}"
-    python3 -m venv "${VENV_PATH}"
-fi
-
-source "${VENV_PATH}/bin/activate"
-print_status "$GREEN" "✅ Virtual environment activated"
-
-# Step 2: Setup .env and check for tokens
-echo ""
-echo -e "${BLUE}Step 2/7: Setting up environment and tokens...${NC}"
-
-# Create .env if doesn't exist
-if [ ! -f .env ]; then
-    if [ -f env_template.txt ]; then
+# Create .env from template if it doesn't exist
+if [ ! -f ".env" ]; then
+    if [ -f "env_template.txt" ]; then
         cp env_template.txt .env
-        print_status "$GREEN" "✅ Created .env from template"
+        print_status ".env file created from template"
     else
-        print_status "$RED" "❌ env_template.txt not found"
+        print_error "env_template.txt not found!"
         exit 1
     fi
 else
-    print_status "$GREEN" "✅ .env file exists"
+    print_status ".env file already exists"
 fi
 
-# Check if we have a token in .env
-source .env 2>/dev/null || true
-
-if [ -n "$AUTH_TOKEN" ] && [ "$AUTH_TOKEN" != "sk-123456" ]; then
-    # We have a real token configured
-    TOKEN_PREVIEW="${AUTH_TOKEN:0:20}...${AUTH_TOKEN: -10}"
-    print_status "$GREEN" "✅ Found existing token: $TOKEN_PREVIEW"
-elif [ -n "$ZAI_TOKEN" ]; then
-    # We have ZAI_TOKEN
-    TOKEN_PREVIEW="${ZAI_TOKEN:0:20}...${ZAI_TOKEN: -10}"
-    print_status "$GREEN" "✅ Found existing ZAI_TOKEN: $TOKEN_PREVIEW"
-else
-    # No token found
-    print_status "$YELLOW" "⚠️  No authentication token configured"
-    print_status "$YELLOW" "   Server will use anonymous/guest mode"
-    print_status "$BLUE" ""
-    print_status "$BLUE" "   To use authenticated mode:"
-    print_status "$BLUE" "   1. Login at https://chat.z.ai"
-    print_status "$BLUE" "   2. Get token from browser (see QUICK_START.md)"
-    print_status "$BLUE" "   3. Run: bash scripts/get_token_from_browser.sh"
+# Load environment variables
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
 fi
 
-# Step 3: Install Python dependencies
-echo ""
-echo -e "${BLUE}Step 3/7: Installing Python dependencies...${NC}"
-if pip3 install -q -r requirements.txt; then
-    print_status "$GREEN" "✅ Dependencies installed successfully"
-else
-    print_status "$RED" "❌ Failed to install dependencies"
-    exit 1
+# Check if SERVER_PORT is set, if not use default
+if [ -z "$SERVER_PORT" ]; then
+    export SERVER_PORT="${LISTEN_PORT:-8080}"
 fi
 
-# Step 4: Verify openai package
-echo ""
-echo -e "${BLUE}Step 4/7: Verifying openai package...${NC}"
-if python3 -c "import openai; print(f'OpenAI SDK version: {openai.__version__}')" 2>&1; then
-    print_status "$GREEN" "✅ OpenAI SDK is ready"
-else
-    print_status "$BLUE" "ℹ️  Installing openai package..."
-    pip3 install -q openai
-    print_status "$GREEN" "✅ OpenAI SDK installed"
+# Update .env with SERVER_PORT if needed
+if ! grep -q "^SERVER_PORT=" .env 2>/dev/null; then
+    echo "SERVER_PORT=${SERVER_PORT}" >> .env
+    print_status "SERVER_PORT set to ${SERVER_PORT}"
 fi
 
-# Step 5: Check configuration
-echo ""
-echo -e "${BLUE}Step 5/7: Checking configuration...${NC}"
-source .env
-if [ -n "$AUTH_TOKEN" ] && [ -n "$API_ENDPOINT" ]; then
-    print_status "$GREEN" "✅ AUTH_TOKEN configured"
-    print_status "$GREEN" "✅ API_ENDPOINT configured: ${API_ENDPOINT}"
-else
-    print_status "$RED" "❌ Configuration incomplete in .env"
-    exit 1
-fi
+# =============================================================================
+# PART 4: TOKEN CONFIGURATION (OPTIONAL)
+# =============================================================================
 
-# Step 6: Create test_results directory
-echo ""
-echo -e "${BLUE}Step 6/7: Creating test_results directory...${NC}"
-mkdir -p test_results
-print_status "$GREEN" "✅ test_results directory ready"
+print_header "Step 4: Token Configuration (Optional)"
 
-# Step 7: Set SERVER_PORT
-echo ""
-echo -e "${BLUE}Step 7/7: Configuring SERVER_PORT...${NC}"
-if [ -n "$SERVER_PORT" ]; then
-    # Update LISTEN_PORT in .env if SERVER_PORT is provided
-    if grep -q "^LISTEN_PORT=" .env; then
-        sed -i "s/^LISTEN_PORT=.*/LISTEN_PORT=${SERVER_PORT}/" .env
+# Check if ZAI_TOKEN is already set
+if [ -n "$ZAI_TOKEN" ] && [ "$ZAI_TOKEN" != "" ]; then
+    print_status "ZAI_TOKEN already configured"
+    
+    # Validate token format (JWT)
+    if [[ "$ZAI_TOKEN" =~ ^eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*$ ]]; then
+        print_status "Token format validated"
     else
-        echo "LISTEN_PORT=${SERVER_PORT}" >> .env
+        print_warning "Token format looks invalid (not a JWT)"
     fi
-    print_status "$GREEN" "✅ SERVER_PORT set to ${SERVER_PORT}"
 else
-    # Use default 7322 if not provided
-    if ! grep -q "^LISTEN_PORT=" .env; then
-        echo "LISTEN_PORT=7322" >> .env
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}No ZAI_TOKEN configured - Anonymous mode will be used${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "Anonymous mode:"
+    echo "  ✅ Works immediately"
+    echo "  ✅ No login required"
+    echo "  ⚠️  Some features may be limited"
+    echo ""
+    echo "To use authenticated mode (full features):"
+    echo "  1. Go to https://chat.z.ai and login"
+    echo "  2. Open DevTools (F12) → Application → Local Storage"
+    echo "  3. Copy the 'token' value"
+    echo "  4. Add to .env: ZAI_TOKEN=your_token_here"
+    echo ""
+    echo -e "${YELLOW}Continue with anonymous mode? [Y/n]${NC}"
+    read -r response
+    if [[ "$response" =~ ^[Nn]$ ]]; then
+        echo ""
+        echo "Paste your ZAI_TOKEN (or press Enter to skip):"
+        read -r token_input
+        
+        if [ -n "$token_input" ]; then
+            # Validate token format
+            if [[ "$token_input" =~ ^eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*$ ]]; then
+                # Save to .env
+                if grep -q "^ZAI_TOKEN=" .env 2>/dev/null; then
+                    sed -i.bak "s|^ZAI_TOKEN=.*|ZAI_TOKEN=$token_input|" .env
+                else
+                    echo "ZAI_TOKEN=$token_input" >> .env
+                fi
+                print_status "Token saved to .env"
+            else
+                print_error "Invalid token format (not a JWT)"
+                print_warning "Continuing with anonymous mode"
+            fi
+        else
+            print_status "Using anonymous mode"
+        fi
+    else
+        print_status "Using anonymous mode"
     fi
-    print_status "$GREEN" "✅ Using default SERVER_PORT: 7322"
 fi
 
-# ============================================================
-# PART 2: TOKEN VALIDATION (Consolidated from validate_token.sh)
-# ============================================================
+# =============================================================================
+# PART 5: FLAREPROX INTEGRATION (OPTIONAL)
+# =============================================================================
 
-print_header "🔐 JWT Token Validation"
+print_header "Step 5: FlareProx Integration (Optional)"
 
-# Check if ZAI_TOKEN is set
-if [ -z "$ZAI_TOKEN" ]; then
-    print_status "$YELLOW" "⚠️  ZAI_TOKEN not set in .env"
-    print_status "$BLUE" "ℹ️  Anonymous token mode will be used"
-    print_header "✅ Setup Complete!"
-    echo ""
-    echo "Next steps:"
-    echo "  1. Set ZAI_TOKEN in .env for authenticated mode"
-    echo "  2. Run: ./scripts/start.sh"
-    echo "  3. Test: ./scripts/send_request.sh"
-    echo ""
-    exit 0
+# Check if ENABLE_FLAREPROX is set
+if [ "$ENABLE_FLAREPROX" = "true" ]; then
+    echo "FlareProx is enabled - checking requirements..."
+    
+    # Check if Cloudflare credentials are set
+    if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+        print_status "Cloudflare credentials found"
+        
+        # Check if flareprox is installed
+        if command -v flareprox &> /dev/null; then
+            print_status "FlareProx already installed"
+        else
+            echo "Installing FlareProx..."
+            pip install git+https://github.com/serversideup/flareprox.git > /dev/null 2>&1
+            print_status "FlareProx installed"
+        fi
+        
+        # Deploy FlareProx workers
+        echo "Deploying FlareProx Cloudflare Workers..."
+        flareprox deploy --account-id "$CLOUDFLARE_ACCOUNT_ID" --api-token "$CLOUDFLARE_API_TOKEN" > /dev/null 2>&1
+        print_status "FlareProx workers deployed"
+        
+        # Get FlareProx URL
+        FLAREPROX_URL=$(flareprox list --account-id "$CLOUDFLARE_ACCOUNT_ID" --api-token "$CLOUDFLARE_API_TOKEN" 2>/dev/null | grep -oP 'https://[^[:space:]]+' | head -1)
+        
+        if [ -n "$FLAREPROX_URL" ]; then
+            # Update .env with FlareProx URL
+            if grep -q "^FLAREPROX_URL=" .env 2>/dev/null; then
+                sed -i.bak "s|^FLAREPROX_URL=.*|FLAREPROX_URL=$FLAREPROX_URL|" .env
+            else
+                echo "FLAREPROX_URL=$FLAREPROX_URL" >> .env
+            fi
+            print_status "FlareProx URL configured: $FLAREPROX_URL"
+        else
+            print_warning "Could not get FlareProx URL automatically"
+        fi
+    else
+        print_warning "Cloudflare credentials not found - FlareProx disabled"
+        echo "To enable FlareProx, set:"
+        echo "  CLOUDFLARE_API_TOKEN=your_token"
+        echo "  CLOUDFLARE_ACCOUNT_ID=your_account_id"
+    fi
+else
+    print_status "FlareProx integration skipped (ENABLE_FLAREPROX not set to 'true')"
 fi
 
-print_status "$BLUE" "ℹ️  Token found in .env"
-TOKEN_PREVIEW="${ZAI_TOKEN:0:20}...${ZAI_TOKEN: -20}"
-echo "   Preview: $TOKEN_PREVIEW"
+# =============================================================================
+# PART 6: VALIDATION
+# =============================================================================
 
-# Test 1: Check JWT format (3 parts)
-echo ""
-echo -e "${BLUE}Token Test 1/6: JWT Format Check${NC}"
-TOKEN_PARTS=$(echo "$ZAI_TOKEN" | tr '.' '\n' | wc -l)
-if [ "$TOKEN_PARTS" -eq 3 ]; then
-    print_status "$GREEN" "✅ Valid JWT format (3 parts)"
+print_header "Step 6: Configuration Validation"
+
+# Check critical files
+for file in "main.py" "src/config.py" "requirements.txt"; do
+    if [ -f "$file" ]; then
+        print_status "$file exists"
+    else
+        print_error "$file not found!"
+        exit 1
+    fi
+done
+
+# Check Python imports
+echo "Validating Python dependencies..."
+python3 -c "import fastapi, httpx, dotenv" 2>/dev/null
+if [ $? -eq 0 ]; then
+    print_status "Python dependencies validated"
 else
-    print_status "$RED" "❌ Invalid JWT format (expected 3 parts, got $TOKEN_PARTS)"
+    print_error "Python dependency validation failed"
     exit 1
 fi
 
-# Test 2: Decode JWT payload using Python
+# =============================================================================
+# SETUP COMPLETE
+# =============================================================================
+
 echo ""
-echo -e "${BLUE}Token Test 2/6: JWT Payload Decoding${NC}"
-DECODE_RESULT=$(python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from signature import decode_jwt_payload
-    import json
-    token = os.getenv('ZAI_TOKEN')
-    payload = decode_jwt_payload(token)
-    if payload:
-        print(json.dumps(payload, indent=2))
-        sys.exit(0)
-    else:
-        print('Failed to decode payload')
-        sys.exit(1)
-except Exception as e:
-    print(f'Decode error: {e}')
-    sys.exit(1)
-" 2>&1) || true
-
-DECODE_EXIT_CODE=$?
-if [ $DECODE_EXIT_CODE -eq 0 ]; then
-    print_status "$GREEN" "✅ Successfully decoded JWT payload"
-else
-    print_status "$YELLOW" "⚠️  JWT decode failed (token may still work)"
-fi
-
-# Test 3: Extract user_id
+print_header "🎉 Setup Complete!"
 echo ""
-echo -e "${BLUE}Token Test 3/6: User ID Extraction${NC}"
-USER_ID=$(python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from signature import extract_user_id_from_token
-    token = os.getenv('ZAI_TOKEN')
-    user_id = extract_user_id_from_token(token)
-    print(user_id)
-except:
-    print('guest')
-" 2>/dev/null || echo "guest")
-
-if [ "$USER_ID" != "guest" ]; then
-    print_status "$GREEN" "✅ Successfully extracted user_id: $USER_ID"
-else
-    print_status "$YELLOW" "⚠️  Using guest user_id"
-fi
-
-# Test 4: Check token expiration
-echo ""
-echo -e "${BLUE}Token Test 4/6: Token Expiration Check${NC}"
-EXP_CHECK=$(python3 -c "
-import sys
-import os
-import time
-sys.path.insert(0, 'src')
-try:
-    from signature import decode_jwt_payload
-    token = os.getenv('ZAI_TOKEN')
-    payload = decode_jwt_payload(token)
-    if 'exp' in payload:
-        exp_time = payload['exp']
-        current_time = int(time.time())
-        if exp_time > current_time:
-            remaining = exp_time - current_time
-            print(f'valid|{remaining}')
-        else:
-            print('expired')
-    else:
-        print('no_expiration')
-except:
-    print('no_expiration')
-" 2>/dev/null || echo "no_expiration")
-
-if [[ "$EXP_CHECK" == valid* ]]; then
-    REMAINING=$(echo "$EXP_CHECK" | cut -d'|' -f2)
-    HOURS=$((REMAINING / 3600))
-    MINUTES=$(((REMAINING % 3600) / 60))
-    print_status "$GREEN" "✅ Token is valid"
-    echo "   Remaining time: ${HOURS}h ${MINUTES}m"
-elif [ "$EXP_CHECK" == "expired" ]; then
-    print_status "$YELLOW" "⚠️  Token may be expired (continuing...)"
-elif [ "$EXP_CHECK" == "no_expiration" ]; then
-    print_status "$BLUE" "ℹ️  Token has no expiration field"
-fi
-
-# Test 5: Test signature generation
-echo ""
-echo -e "${BLUE}Token Test 5/6: Signature Generation Test${NC}"
-TEST_MSG="Hello, world!"
-TIMESTAMP=$(date +%s)000
-REQUEST_ID="test-$(python3 -c "import uuid; print(str(uuid.uuid4()))" 2>/dev/null || echo "12345")"
-
-SIGNATURE=$(python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from signature import generate_zs_signature
-    token = os.getenv('ZAI_TOKEN')
-    signature_result = generate_zs_signature(
-        token=token,
-        request_id='$REQUEST_ID',
-        timestamp=$TIMESTAMP,
-        user_content='$TEST_MSG'
-    )
-    print(signature_result['signature'])
-except Exception as e:
-    print('')
-" 2>/dev/null || echo "")
-
-if [ -n "$SIGNATURE" ] && [ ${#SIGNATURE} -eq 64 ]; then
-    print_status "$GREEN" "✅ Successfully generated signature"
-else
-    print_status "$YELLOW" "⚠️  Signature generation skipped (may not be required)"
-fi
-
-# Test 6: Validate with validation module
-echo ""
-echo -e "${BLUE}Token Test 6/6: Validation Module Test${NC}"
-python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from validation import validate_token, print_validation_result
-    token = os.getenv('ZAI_TOKEN')
-    result = validate_token(token)
-    print_validation_result(result, 'Token Validation')
-    sys.exit(0 if result.valid else 1)
-except Exception as e:
-    print(f'Validation module not available: {e}')
-    sys.exit(0)
-" 2>/dev/null
-
-VALIDATION_EXIT_CODE=$?
-if [ $VALIDATION_EXIT_CODE -eq 0 ]; then
-    print_status "$GREEN" "✅ Token validation passed"
-else
-    print_status "$YELLOW" "⚠️  Token validation had warnings (continuing...)"
-fi
-
-# ============================================================
-# FINAL SUMMARY
-# ============================================================
-
-print_header "✅ Setup & Validation Complete!"
-echo ""
-echo "Environment Status:"
-echo "  ✅ Python dependencies installed"
-echo "  ✅ OpenAI SDK ready"
-echo "  ✅ Configuration validated"
-echo "  ✅ Token validated (User: $USER_ID)"
+echo "Configuration Summary:"
+echo "  📁 Virtual Environment: $VENV_PATH"
+echo "  🐍 Python Version: $PYTHON_VERSION"
+echo "  🔧 Server Port: $SERVER_PORT"
+echo "  🔐 Authentication: $([ -n "$ZAI_TOKEN" ] && echo "Configured (Token)" || echo "Anonymous Mode")"
+echo "  🌐 FlareProx: $([ "$ENABLE_FLAREPROX" = "true" ] && echo "Enabled" || echo "Disabled")"
 echo ""
 echo "Next steps:"
-echo "  1. Run: ./scripts/start.sh"
-echo "  2. Test: ./scripts/send_request.sh"
-echo "  3. Or run complete pipeline: ./scripts/all.sh"
+echo "  1. Start server: bash scripts/start.sh"
+echo "  2. Test API: bash scripts/send_request.sh"
+echo "  3. Or run all: bash scripts/all.sh"
 echo ""
+

@@ -247,10 +247,38 @@ function generateRandomIP() {
     
 
     
-    def get_worker(self) -> Optional[FlareProxWorker]:
-        """Get next worker using simple round-robin."""
-        if not self.workers:
+    async def get_worker(self) -> Optional[FlareProxWorker]:
+        """Get next worker using simple round-robin. Creates workers on-demand."""
+        if not self.enabled:
             return None
+        
+        # Create first worker if none exist (on-demand)
+        if not self.workers:
+            # Check throttling - don't spam worker creation
+            current_time = time.time()
+            if current_time - self._last_worker_creation < 5:
+                debug_log("[FLAREPROX] Throttling worker creation (5s cooldown)")
+                return None
+            
+            info_log("[FLAREPROX] Creating first worker on-demand...")
+            self._last_worker_creation = current_time
+            worker = await self._create_worker()
+            if worker:
+                self.workers.append(worker)
+                info_log(f"[FLAREPROX] ✅ First worker created: {worker.name}")
+            else:
+                return None
+        
+        # Create additional workers if under max (on-demand scaling)
+        elif len(self.workers) < self.max_workers:
+            current_time = time.time()
+            if current_time - self._last_worker_creation >= 5:  # 5-second throttle
+                info_log(f"[FLAREPROX] Creating worker #{len(self.workers) + 1} (max: {self.max_workers})...")
+                self._last_worker_creation = current_time
+                worker = await self._create_worker()
+                if worker:
+                    self.workers.append(worker)
+                    info_log(f"[FLAREPROX] ✅ Worker created: {worker.name} (total: {len(self.workers)})")
         
         # Simple round-robin selection
         worker = self.workers[self._current_index % len(self.workers)]

@@ -211,12 +211,13 @@ async def get_flareprox_worker() -> Optional[str]:
         if not manager or not manager.enabled:
             return None
         
-        worker = manager.get_worker()
+        worker = await manager.get_worker()
         if worker:
+            info_log(f"[FLAREPROX] ✅ Request routed through worker: {worker.name}")
             return worker.url
         return None
     except Exception as e:
-        debug_log(f"[FLAREPROX] Error: {e}")
+        error_log(f"[FLAREPROX] Error getting worker: {e}")
         return None
 
 

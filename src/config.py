@@ -118,7 +118,7 @@ class Settings(BaseSettings):
     # Z.AI Token Configuration
     ZAI_TOKEN: str = os.getenv("ZAI_TOKEN", "")
     ZAI_SIGNING_SECRET: str = os.getenv("ZAI_SIGNING_SECRET", "junjie")
-    ZAI_FE_VERSION: str = os.getenv("ZAI_FE_VERSION", "prod-fe-1.0.78")
+    ZAI_FE_VERSION: str = os.getenv("ZAI_FE_VERSION", "prod-fe-1.0.103")
     
     # Anonymous Token Configuration - 匿名Token配置
     ENABLE_GUEST_TOKEN: bool = os.getenv("ENABLE_GUEST_TOKEN", "true").lower() == "true"
@@ -173,6 +173,7 @@ class Settings(BaseSettings):
     CLOUDFLARE_API_TOKEN: Optional[str] = os.getenv("CLOUDFLARE_API_TOKEN")
     CLOUDFLARE_ACCOUNT_ID: Optional[str] = os.getenv("CLOUDFLARE_ACCOUNT_ID")
     ENABLE_FLAREPROX: bool = os.getenv("ENABLE_FLAREPROX", "false").lower() == "true"
+    FLAREPROX_MAX_WORKERS: int = int(os.getenv("FLAREPROX_MAX_WORKERS", "4"))  # Maximum workers (default: 4)
     
     
     # Toolify Configuration - 工具调用功能配置

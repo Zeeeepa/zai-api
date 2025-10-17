@@ -6,7 +6,6 @@ Dynamically creates and manages Cloudflare Worker proxies with load balancing
 
 import asyncio
 import json
-import random
 import time
 from typing import Dict, List, Optional
 import httpx
@@ -27,31 +26,6 @@ class FlareProxWorker:
         self.name = name
         self.url = url
         self.created_at = created_at
-        self.failures = 0
-        self.last_used = 0
-        self.total_requests = 0
-        self.is_healthy = True
-    
-    def mark_success(self):
-        """Mark a successful request."""
-        self.failures = 0
-        self.last_used = time.time()
-        self.total_requests += 1
-        self.is_healthy = True
-    
-    def mark_failure(self):
-        """Mark a failed request."""
-        self.failures += 1
-        self.last_used = time.time()
-        if self.failures >= 3:
-            self.is_healthy = False
-            error_log(f"[FLAREPROX] Worker {self.name} marked unhealthy after {self.failures} failures")
-    
-    def reset_health(self):
-        """Reset health status."""
-        self.failures = 0
-        self.is_healthy = True
-        info_log(f"[FLAREPROX] Worker {self.name} health reset")
 
 
 class FlareProxManager:
@@ -63,9 +37,8 @@ class FlareProxManager:
         self.enabled = bool(self.api_token and self.account_id)
         
         self.workers: List[FlareProxWorker] = []
-        self.min_workers = 2  # Minimum number of workers to maintain
-        self.max_workers = 10  # Maximum number of workers
-        self.target_workers = 3  # Target number of workers
+        self.max_workers = settings.FLAREPROX_MAX_WORKERS  # Default: 4 workers max
+        self._current_index = 0  # For round-robin selection
         
         self.base_url = "https://api.cloudflare.com/client/v4"
         self.headers = {
@@ -74,39 +47,18 @@ class FlareProxManager:
         }
         
         self._account_subdomain = None
-        self._init_lock = asyncio.Lock()
-        self._initialized = False
+        self._last_worker_creation = 0  # Throttling: track last worker creation time
         
         if self.enabled:
-            info_log("[FLAREPROX] Manager initialized", 
-                    account_id=self.account_id[:8] + "...",
-                    min_workers=self.min_workers,
-                    target_workers=self.target_workers)
+            info_log("[FLAREPROX] ✅ FlareProx enabled - Workers will be created on-demand", 
+                    max_workers=self.max_workers,
+                    account_id=self.account_id[:8] + "...")
         else:
-            debug_log("[FLAREPROX] Manager disabled (no credentials)")
+            info_log("[FLAREPROX] ℹ️  FlareProx disabled - using direct connection")
     
     async def initialize(self):
-        """Initialize the FlareProx manager by syncing existing workers."""
-        if not self.enabled:
-            return
-        
-        async with self._init_lock:
-            if self._initialized:
-                return
-            
-            info_log("[FLAREPROX] Initializing manager...")
-            
-            # Sync existing workers
-            await self._sync_workers()
-            
-            # Ensure we have minimum workers
-            if len(self.workers) < self.min_workers:
-                needed = self.min_workers - len(self.workers)
-                info_log(f"[FLAREPROX] Creating {needed} initial workers...")
-                await self._create_workers(needed)
-            
-            self._initialized = True
-            info_log(f"[FLAREPROX] Manager ready with {len(self.workers)} workers")
+        """Initialize is now a no-op - workers created on-demand."""
+        pass
     
     @property
     async def worker_subdomain(self) -> str:
@@ -206,6 +158,7 @@ async function handleRequest(request) {
     responseHeaders.set('Access-Control-Allow-Origin', '*')
     responseHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD')
     responseHeaders.set('Access-Control-Allow-Headers', '*')
+    responseHeaders.set('X-FlareProx-Worker', 'WORKER_NAME_PLACEHOLDER')  // Will be replaced during deployment
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: responseHeaders })
@@ -240,11 +193,22 @@ function generateRandomIP() {
 }'''
     
     async def _create_worker(self, name: Optional[str] = None) -> Optional[FlareProxWorker]:
-        """Create a single Cloudflare Worker."""
+        """Create a single Cloudflare Worker with throttling."""
+        # Throttling: prevent creating workers too quickly (max 1 per 5 seconds)
+        current_time = time.time()
+        time_since_last = current_time - self._last_worker_creation
+        if time_since_last < 5.0:
+            wait_time = 5.0 - time_since_last
+            debug_log(f"[FLAREPROX] Throttling worker creation - waiting {wait_time:.1f}s")
+            await asyncio.sleep(wait_time)
+        
+        self._last_worker_creation = time.time()
+        
         if not name:
             name = self._generate_worker_name()
         
-        script_content = self._get_worker_script()
+        # Replace placeholder with actual worker name in script
+        script_content = self._get_worker_script().replace('WORKER_NAME_PLACEHOLDER', name)
         url = f"{self.base_url}/accounts/{self.account_id}/workers/scripts/{name}"
         
         files = {
@@ -281,170 +245,63 @@ function generateRandomIP() {
             error_log(f"[FLAREPROX] Failed to create worker: {e}")
             return None
     
-    async def _create_workers(self, count: int) -> List[FlareProxWorker]:
-        """Create multiple workers concurrently."""
-        tasks = [self._create_worker() for _ in range(count)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        workers = []
-        for result in results:
-            if isinstance(result, FlareProxWorker):
-                workers.append(result)
-                self.workers.append(result)
-        
-        return workers
-    
-    async def _sync_workers(self):
-        """Sync workers from Cloudflare."""
-        url = f"{self.base_url}/accounts/{self.account_id}/workers/scripts"
-        
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, headers=self.headers, timeout=30)
-                response.raise_for_status()
-            
-            data = response.json()
-            subdomain = await self.worker_subdomain
-            synced_count = 0
-            
-            for script in data.get("result", []):
-                name = script.get("id", "")
-                if name.startswith("zai-proxy-"):
-                    url = f"https://{name}.{subdomain}.workers.dev"
-                    created_at = script.get("created_on", "unknown")
-                    
-                    # Check if already in list
-                    if not any(w.name == name for w in self.workers):
-                        worker = FlareProxWorker(name, url, created_at)
-                        self.workers.append(worker)
-                        synced_count += 1
-            
-            if synced_count > 0:
-                info_log(f"[FLAREPROX] Synced {synced_count} existing workers")
-                
-        except Exception as e:
-            error_log(f"[FLAREPROX] Failed to sync workers: {e}")
+
     
     def get_worker(self) -> Optional[FlareProxWorker]:
-        """Get a healthy worker using weighted random selection (less used = higher chance)."""
+        """Get next worker using simple round-robin."""
         if not self.workers:
             return None
         
-        # Filter healthy workers
-        healthy_workers = [w for w in self.workers if w.is_healthy]
+        # Simple round-robin selection
+        worker = self.workers[self._current_index % len(self.workers)]
+        self._current_index += 1
         
-        if not healthy_workers:
-            # All workers unhealthy, reset and try again
-            info_log("[FLAREPROX] All workers unhealthy, resetting health status")
-            for worker in self.workers:
-                worker.reset_health()
-            healthy_workers = self.workers
-        
-        # Weighted random selection (less used = higher weight)
-        max_requests = max(w.total_requests for w in healthy_workers) + 1
-        weights = [max_requests - w.total_requests + 1 for w in healthy_workers]
-        
-        return random.choices(healthy_workers, weights=weights)[0]
+        return worker
     
     async def get_proxy_url(self, target_url: str) -> Optional[str]:
-        """Get a proxied URL for the target."""
+        """Get a proxied URL for the target. Creates workers on-demand."""
         if not self.enabled:
             return None
         
-        # Ensure initialized
-        if not self._initialized:
-            await self.initialize()
-        
-        worker = self.get_worker()
-        if not worker:
-            # Try to create emergency worker
-            info_log("[FLAREPROX] No workers available, creating emergency worker")
+        # Create first worker if none exist
+        if not self.workers:
+            info_log("[FLAREPROX] Creating first worker on-demand...")
             worker = await self._create_worker()
             if worker:
                 self.workers.append(worker)
+                info_log(f"[FLAREPROX] ✅ First worker created: {worker.name}")
         
+        # Create additional workers if under max (on-demand scaling)
+        elif len(self.workers) < self.max_workers:
+            # Create new worker for load distribution
+            info_log(f"[FLAREPROX] Creating worker #{len(self.workers) + 1} (max: {self.max_workers})...")
+            worker = await self._create_worker()
+            if worker:
+                self.workers.append(worker)
+                info_log(f"[FLAREPROX] ✅ Worker created: {worker.name} (total: {len(self.workers)})")
+        
+        # Get next worker (round-robin)
+        worker = self.get_worker()
         if not worker:
             return None
         
         # Return proxy URL
         proxy_url = f"{worker.url}?url={target_url}"
-        debug_log(f"[FLAREPROX] Selected worker", worker=worker.name, total_requests=worker.total_requests)
+        info_log(f"[FLAREPROX] Using worker: {worker.name}")
         return proxy_url
     
-    def mark_worker_success(self, worker_url: str):
-        """Mark a worker as successful."""
-        for worker in self.workers:
-            if worker.url in worker_url:
-                worker.mark_success()
-                break
-    
-    def mark_worker_failure(self, worker_url: str):
-        """Mark a worker as failed."""
-        for worker in self.workers:
-            if worker.url in worker_url:
-                worker.mark_failure()
-                break
-    
-    async def scale_workers(self):
-        """Scale workers based on load and health."""
-        if not self.enabled or not self._initialized:
-            return
-        
-        healthy_count = sum(1 for w in self.workers if w.is_healthy)
-        
-        # Scale up if below target
-        if healthy_count < self.target_workers and len(self.workers) < self.max_workers:
-            needed = min(self.target_workers - healthy_count, self.max_workers - len(self.workers))
-            info_log(f"[FLAREPROX] Scaling up: creating {needed} workers")
-            await self._create_workers(needed)
-        
-        # Scale down if too many unhealthy
-        unhealthy_count = len(self.workers) - healthy_count
-        if unhealthy_count > 3 and len(self.workers) > self.min_workers:
-            # Remove oldest unhealthy workers
-            unhealthy_workers = sorted(
-                [w for w in self.workers if not w.is_healthy],
-                key=lambda w: w.last_used
-            )
-            
-            to_remove = unhealthy_workers[:unhealthy_count - 1]
-            for worker in to_remove:
-                info_log(f"[FLAREPROX] Removing unhealthy worker: {worker.name}")
-                await self._delete_worker(worker)
-                self.workers.remove(worker)
-    
-    async def _delete_worker(self, worker: FlareProxWorker):
-        """Delete a worker from Cloudflare."""
-        url = f"{self.base_url}/accounts/{self.account_id}/workers/scripts/{worker.name}"
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.delete(url, headers=self.headers, timeout=30)
-            debug_log(f"[FLAREPROX] Deleted worker: {worker.name}")
-        except Exception as e:
-            debug_log(f"[FLAREPROX] Failed to delete worker {worker.name}: {e}")
+
     
     def get_stats(self) -> Dict:
-        """Get worker statistics."""
+        """Get simple worker statistics."""
         if not self.enabled:
             return {"enabled": False}
         
-        healthy = [w for w in self.workers if w.is_healthy]
         return {
             "enabled": True,
-            "total_workers": len(self.workers),
-            "healthy_workers": len(healthy),
-            "unhealthy_workers": len(self.workers) - len(healthy),
-            "total_requests": sum(w.total_requests for w in self.workers),
-            "workers": [
-                {
-                    "name": w.name,
-                    "url": w.url,
-                    "healthy": w.is_healthy,
-                    "failures": w.failures,
-                    "total_requests": w.total_requests
-                }
-                for w in self.workers
-            ]
+            "worker_count": len(self.workers),
+            "max_workers": self.max_workers,
+            "workers": [w.name for w in self.workers]
         }
 
 

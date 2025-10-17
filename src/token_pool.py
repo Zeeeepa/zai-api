@@ -149,10 +149,16 @@ class TokenPool:
         
         max_retries = 3
         last_status_code = None
+        last_response_body = None
         
         for attempt in range(max_retries):
             try:
                 headers = get_zai_dynamic_headers()
+                
+                # Debug: Log request details
+                debug_log(f"[TOKEN] Fetching anonymous token - Attempt {attempt + 1}/{max_retries}")
+                debug_log(f"[TOKEN] Endpoint: {settings.ZAI_AUTH_ENDPOINT}")
+                debug_log(f"[TOKEN] Headers: {headers}")
                 
                 # 使用外部传入的HTTP客户端，如果没有则创建临时客户端
                 if http_client:
@@ -170,6 +176,17 @@ class TokenPool:
                         headers=headers
                     )
                     
+                    last_status_code = response.status_code
+                    
+                    # Debug: Log response details
+                    try:
+                        last_response_body = response.text
+                        debug_log(f"[TOKEN] Response status: {response.status_code}")
+                        debug_log(f"[TOKEN] Response headers: {dict(response.headers)}")
+                        debug_log(f"[TOKEN] Response body: {last_response_body[:500]}")
+                    except:
+                        pass
+                    
                     if response.status_code == 200:
                         data = response.json()
                         token = data.get("token", "")
@@ -178,8 +195,7 @@ class TokenPool:
                             info_log(f"[OK] 成功获取匿名Token: {token_preview}")
                             return token
                     else:
-                        last_status_code = response.status_code
-                        error_log(f"[WARN] 获取匿名Token失败，状态码: {response.status_code}")
+                        error_log(f"[ERROR] 获取匿名Token失败 - 状态码: {response.status_code}, Body: {last_response_body[:200] if last_response_body else 'N/A'}")
                         
                 finally:
                     # 如果是临时创建的客户端，需要关闭

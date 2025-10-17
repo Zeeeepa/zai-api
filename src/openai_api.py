@@ -169,8 +169,6 @@ _proxy_index = 0  # 当前代理索引
 _proxy_lock = asyncio.Lock()  # 代理切换锁
 
 # ================== FlareProx Worker Management ==================
-_flareprox_worker_index = 0  # Current FlareProx worker rotation index
-_flareprox_worker_lock = asyncio.Lock()  # FlareProx worker selection lock
 
 def init_proxy_pool():
     """初始化代理池（支持从环境变量和proxys.txt加载）"""
@@ -203,39 +201,23 @@ def init_upstream_pool():
 
 async def get_flareprox_worker() -> Optional[str]:
     """
-    Get next healthy FlareProx worker using round-robin strategy.
+    Get next FlareProx worker (delegates to manager).
     
     Returns:
-        Optional[str]: FlareProx worker URL, or None if no healthy workers available
+        Optional[str]: FlareProx worker URL, or None if not enabled
     """
-    global _flareprox_worker_index
-    
-    # Get FlareProx manager instance
     try:
         manager = await get_flareprox_manager()
         if not manager or not manager.enabled:
             return None
+        
+        worker = manager.get_worker()
+        if worker:
+            return worker.url
+        return None
     except Exception as e:
-        debug_log(f"[FLAREPROX] Error getting manager: {e}")
+        debug_log(f"[FLAREPROX] Error: {e}")
         return None
-    
-    # Get healthy workers
-    workers = [w for w in manager.workers if w.is_healthy]
-    if not workers:
-        debug_log("[FLAREPROX] No healthy workers available")
-        return None
-    
-    # Round-robin selection with thread-safe index management
-    async with _flareprox_worker_lock:
-        # Ensure index is within bounds before use, then select worker
-        current_index = _flareprox_worker_index % len(workers)
-        worker = workers[current_index]
-    
-        # Update index for the next call
-        _flareprox_worker_index = (current_index + 1)
-    
-        info_log(f"[FLAREPROX] Selected worker: {worker.name} ({worker.url})")
-        return worker.url
 
 
 async def get_next_proxy() -> Optional[str]:
@@ -629,6 +611,11 @@ async def chat_completions(request: OpenAIRequest, authorization: str = Header(.
                             request_id=request_id,
                             error=(response.status_code != 200)
                         )
+                        # Log FlareProx worker if used
+                        worker_name = response.headers.get("X-FlareProx-Worker")
+                        if worker_name:
+                            info_log(f"[FLAREPROX] ✅ Request routed through worker: {worker_name}")
+                        
                         ttfb = (time.perf_counter() - request_start_time) * 1000
                         debug_log(f"⏱️ 上游TTFB (首字节时间)", ttfb_ms=f"{ttfb:.2f}ms")
                         # 检查响应状态码

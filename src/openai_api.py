@@ -462,9 +462,12 @@ async def chat_completions(request: OpenAIRequest, authorization: str = Header(.
         current_upstream = await get_next_upstream()
         debug_log(f"[REQUEST] 使用上游地址: {current_upstream}")
 
-        # 转换请求
+        # 转换请求s
         request_dict = request.model_dump()
-
+        # 输出客户端请求体
+        request_body = request.model_dump()
+        debug_log("客户端请求体详情", request_body=json_lib.dumps(request_body))
+        
         # 检查是否需要启用工具调用
         enable_toolify = should_enable_toolify(request_dict)
 

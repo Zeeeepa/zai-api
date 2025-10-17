@@ -5,6 +5,7 @@ Dynamically creates and manages Cloudflare Worker proxies with load balancing
 """
 
 import asyncio
+import random
 import json
 import time
 from typing import Dict, List, Optional

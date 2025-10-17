@@ -120,7 +120,7 @@ async def health():
                 stats = manager.get_stats()
             health_data["flareprox"] = {
                 "enabled": True,
-                "total_workers": stats["total_workers"],
+                "worker_count": stats.get("worker_count", 0),
                 "healthy_workers": stats["healthy_workers"],
                 "total_requests": stats["total_requests"]
             }

@@ -1,239 +1,265 @@
 # ZAI-API Scripts
 
-Complete automation scripts for the ZAI OpenAI-compatible API server.
+**Streamlined deployment scripts - Everything you need in 4 files**
 
-## 📦 Scripts Overview
+---
 
-This directory contains 4 essential scripts for running and testing the ZAI-API server:
+## 📁 Scripts Overview
 
-```
-scripts/
-├── all.sh              # Complete pipeline (setup → start → test)
-├── send_request.sh     # Send requests via OpenAI SDK
-├── setup.sh            # Environment setup + token validation
-└── start.sh            # Start server + health checks
-```
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `setup.sh` | Complete environment setup | `bash scripts/setup.sh` |
+| `start.sh` | Start API server | `bash scripts/start.sh` |
+| `send_request.sh` | Test API functionality | `bash scripts/send_request.sh` |
+| `all.sh` | **Run everything** | `bash scripts/all.sh` |
 
 ---
 
 ## 🚀 Quick Start
 
-### **Run Complete Pipeline:**
 ```bash
-./scripts/all.sh
+# Clone repository
+git clone https://github.com/Zeeeepa/zai-api.git
+cd zai-api
+
+# Set configuration (optional)
+export SERVER_PORT=7555
+export CLOUDFLARE_API_TOKEN=your_token    # Optional for FlareProx
+export CLOUDFLARE_ACCOUNT_ID=your_id      # Optional for FlareProx
+
+# Run complete pipeline
+bash scripts/all.sh
 ```
 
-This will:
-1. Set up environment and validate token
-2. Start the OpenAI-compatible API server
-3. Send a test request and display the response
+**That's it!** Server starts, tests run, everything works.
 
 ---
 
-## 📖 Individual Scripts
+## 📝 Detailed Script Documentation
 
-### 1. **setup.sh** - Environment Setup & Token Validation
-
-Sets up your environment and validates JWT tokens.
-
-```bash
-./scripts/setup.sh
-```
+### 1. `setup.sh` - Environment Setup
 
 **What it does:**
-- ✅ Checks Python installation
-- ✅ Creates virtual environment at `.venv/` (or migrates legacy venv)
-- ✅ Creates/verifies `.env` file
-- ✅ Installs all Python dependencies
-- ✅ Verifies OpenAI SDK installation
+- ✅ Creates Python virtual environment (`.venv`)
+- ✅ Installs all dependencies
+- ✅ Creates/validates `.env` configuration
+- ✅ Configures authentication (token or anonymous)
+- ✅ Sets up FlareProx integration (optional)
 - ✅ Validates configuration
-- ✅ Runs 6-step JWT token validation
-  - JWT format check
-  - Payload decoding
-  - User ID extraction
-  - Expiration check
-  - Signature generation test
-  - Validation module test
 
-**Output:**
-- Environment status summary
-- Token validation results
-- Next steps to run
+**Usage:**
+```bash
+bash scripts/setup.sh
+```
+
+**Features:**
+- Automatic virtual environment migration from legacy paths
+- Interactive token configuration
+- FlareProx Cloudflare Workers deployment
+- Comprehensive validation checks
+
+**Environment Variables:**
+- `SERVER_PORT` - Server port (default: 8080)
+- `ZAI_TOKEN` - Your Z.AI token (optional, uses anonymous mode if not set)
+- `ENABLE_FLAREPROX` - Enable proxy rotation (default: false)
+- `CLOUDFLARE_API_TOKEN` - For FlareProx integration
+- `CLOUDFLARE_ACCOUNT_ID` - For FlareProx integration
 
 ---
 
-### 2. **start.sh** - Start Server & Health Checks
-
-Starts the FastAPI server and runs comprehensive health checks.
-
-```bash
-./scripts/start.sh
-```
+### 2. `start.sh` - Start Server
 
 **What it does:**
-- ✅ Checks for existing server processes
-- ✅ Starts FastAPI server on port 8080
-- ✅ Waits for server to be ready
-- ✅ Runs 7-step health check system:
-  1. Schema files verification
-  2. Python dependencies check
-  3. Server status (`/health` endpoint)
-  4. Models endpoint (`/v1/models`)
-  5. Chat completions endpoint test
-  6. Token pool status
-  7. Upstream connectivity (chat.z.ai)
+- ✅ Activates virtual environment
+- ✅ Checks for port conflicts
+- ✅ Launches API server
+- ✅ Performs health checks
+- ✅ Validates all endpoints
+- ✅ Displays server information
 
-**Output:**
-- Server startup status
-- Health check results
-- Server information and endpoints
-- Commands to view logs/stop server
+**Usage:**
+```bash
+bash scripts/start.sh
+```
+
+**Features:**
+- Smart server conflict detection
+- Automatic health validation
+- Available models display
+- Comprehensive server info
 
 **Server Endpoints:**
-- Health: `http://localhost:8080/health`
-- Models: `http://localhost:8080/v1/models`
-- Chat: `http://localhost:8080/v1/chat/completions`
+- Health: `http://localhost:$SERVER_PORT/health`
+- Models: `http://localhost:$SERVER_PORT/v1/models`
+- Chat: `http://localhost:$SERVER_PORT/v1/chat/completions`
 
 ---
 
-### 3. **send_request.sh** - Send OpenAI SDK Requests
+### 3. `send_request.sh` - Test API
 
-Send questions to the API using the OpenAI Python SDK.
+**What it does:**
+- ✅ Checks server availability
+- ✅ Runs non-streaming test
+- ✅ Runs streaming test
+- ✅ Lists available models
+- ✅ Validates API responses
 
+**Usage:**
 ```bash
-./scripts/send_request.sh "Your question here"
-```
-
-**Examples:**
-```bash
-# Default question
-./scripts/send_request.sh
+# Default test
+bash scripts/send_request.sh
 
 # Custom question
-./scripts/send_request.sh "What is Python?"
-
-# Complex question
-./scripts/send_request.sh "Explain quantum computing in simple terms"
+bash scripts/send_request.sh "Your question here"
 ```
 
-**What it does:**
-- ✅ Checks if server is running
-- ✅ Uses OpenAI Python SDK to send request
-- ✅ Displays the complete response
-- ✅ Shows token usage statistics
-- ✅ Saves result to `test_results/` directory
+**Tests Performed:**
+1. **Non-streaming request** - Full response validation
+2. **Streaming request** - Real-time response chunks
+3. **Model listing** - Available models check
 
-**Output:**
-- Request configuration
-- Full AI response
-- Token usage statistics
-- Path to saved result file
+**Example Output:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Test 1: Non-Streaming Request
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Status: Success
+📝 Model: GLM-4.6
+🔢 Tokens: 45
+
+💬 Response:
+Logic takes its form,
+Building worlds from simple lines,
+The machine awakes.
+```
 
 ---
 
-### 4. **all.sh** - Complete Pipeline
-
-Runs the complete workflow: setup → start → test
-
-```bash
-./scripts/all.sh
-```
-
-**With custom question:**
-```bash
-./scripts/all.sh "Explain blockchain technology"
-```
+### 4. `all.sh` - Complete Pipeline
 
 **What it does:**
-- **Step 1/3:** Runs `setup.sh` (environment + validation)
-- **Step 2/3:** Runs `start.sh` (start server + health checks)
-- **Step 3/3:** Runs `send_request.sh` (send test request)
+- ✅ Runs `setup.sh` (environment)
+- ✅ Runs `start.sh` (server)
+- ✅ Runs `send_request.sh` (tests)
+- ✅ Displays summary and usage guide
 
-**Output:**
-- Beautiful progress display for each step
-- Success/failure status for each phase
-- Final summary with all results
+**Usage:**
+```bash
+bash scripts/all.sh
+```
+
+**Pipeline Flow:**
+```
+Step 1/3: Environment Setup & Configuration
+  ↓
+Step 2/3: Start API Server
+  ↓
+Step 3/3: Run API Tests
+  ↓
+🎉 Pipeline Complete!
+```
+
+**What You Get:**
+- Complete deployment in one command
+- Comprehensive validation
+- Ready-to-use API server
+- Usage examples and documentation
 
 ---
 
-## ⚙️ Configuration
+## 🔧 Configuration
 
-All scripts use the `.env` file for configuration:
+### Environment Variables
+
+Set these **before** running scripts:
 
 ```bash
-# Required
-AUTH_TOKEN=your_zai_token_here
-API_ENDPOINT=https://chat.z.ai/api/chat/completions
+# Server Configuration
+export SERVER_PORT=7555              # Default: 8080
 
-# Optional
+# Authentication (Optional)
+export ZAI_TOKEN=your_token_here     # Uses anonymous mode if not set
+
+# FlareProx Integration (Optional)
+export ENABLE_FLAREPROX=true
+export CLOUDFLARE_API_TOKEN=your_token
+export CLOUDFLARE_ACCOUNT_ID=your_account_id
+```
+
+### Configuration File
+
+All settings are stored in `.env`:
+
+```env
+# Server
 LISTEN_PORT=8080
-ZAI_TOKEN=your_zai_token_here
+AUTH_TOKEN=sk-123456
+
+# Authentication
+ZAI_TOKEN=your_token_here         # Optional
+
+# Features
+ENABLE_GUEST_TOKEN=true           # Anonymous mode
+ENABLE_TOOLIFY=true               # Function calling
+DEBUG_LOGGING=false               # Verbose logs
+
+# FlareProx (Optional)
+ENABLE_FLAREPROX=false
+CLOUDFLARE_API_TOKEN=your_token
+CLOUDFLARE_ACCOUNT_ID=your_id
 ```
 
 ---
 
-## 📁 Output Files
+## 📊 Common Workflows
 
-All test results are saved to `test_results/` directory:
+### First Time Setup
 
-```
-test_results/
-└── result_20251015_145841.txt  # Timestamped results
-```
-
-Each result file contains:
-- Original question
-- Timestamp
-- Complete AI response
-- Token usage statistics
-
----
-
-## 🔧 Requirements
-
-- **Python:** 3.8+
-- **Dependencies:** Automatically installed by `setup.sh`
-- **OpenAI SDK:** Version 1.0.0+
-
----
-
-## 🎯 Common Workflows
-
-### **First Time Setup:**
 ```bash
-# 1. Setup environment
-./scripts/setup.sh
-
-# 2. Start server
-./scripts/start.sh
-
-# 3. Test with a question
-./scripts/send_request.sh "Hello!"
+git clone https://github.com/Zeeeepa/zai-api.git
+cd zai-api
+bash scripts/all.sh
 ```
 
-### **Development:**
+### Update & Restart
+
 ```bash
-# Quick test after code changes
-./scripts/all.sh "Test question"
+git pull origin main
+bash scripts/setup.sh    # Reinstall dependencies
+bash scripts/start.sh    # Restart server
 ```
 
-### **Server Management:**
+### Development Workflow
+
 ```bash
-# Start server
-./scripts/start.sh
+# Make code changes
+# ...
 
-# View logs
-tail -f server.log
+# Test changes
+bash scripts/start.sh        # Start server
+bash scripts/send_request.sh # Validate
+```
 
-# Stop server
-pkill -f 'python3 main.py'
+### Production Deployment
+
+```bash
+# Set production port
+export SERVER_PORT=8080
+
+# Configure authentication
+export ZAI_TOKEN=production_token
+
+# Deploy
+bash scripts/all.sh
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-### **Server won't start:**
+### Server Won't Start
+
 ```bash
 # Check if port is in use
 lsof -i :8080
@@ -241,71 +267,130 @@ lsof -i :8080
 # Kill existing process
 pkill -f 'python3 main.py'
 
-# Try again
-./scripts/start.sh
+# Restart
+bash scripts/start.sh
 ```
 
-### **Dependencies issues:**
+### Dependencies Issue
+
 ```bash
-# Reinstall dependencies
-pip3 install -r requirements.txt --force-reinstall
+# Reinstall everything
+rm -rf .venv
+bash scripts/setup.sh
 ```
 
-### **Token validation warnings:**
-- Token validation warnings are **non-fatal**
-- The scripts will continue even with warnings
-- Check your token in `.env` file
+### Token Not Working
 
----
+```bash
+# Use anonymous mode
+# Just remove or comment out ZAI_TOKEN in .env
 
-## 📊 Features
+# Or get new token from https://chat.z.ai
+# DevTools → Application → Local Storage → token
+```
 
-✅ **OpenAI SDK Integration** - Uses official OpenAI Python library  
-✅ **Non-Fatal Validation** - Continues even with warnings  
-✅ **Comprehensive Health Checks** - 7-step validation system  
-✅ **Automatic Result Saving** - All responses saved to files  
-✅ **Beautiful Output** - Color-coded status messages  
-✅ **Error Handling** - Graceful error messages at each step  
+### View Logs
 
----
+```bash
+# Live logs
+tail -f server.log
 
-## 🔗 API Compatibility
-
-This server is **100% OpenAI-compatible**. You can use it as a drop-in replacement:
-
-```python
-import openai
-
-client = openai.OpenAI(
-    base_url="http://localhost:8080/v1",  # Your local server
-    api_key="your_token"
-)
-
-response = client.chat.completions.create(
-    model="GLM-4.5",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-
-print(response.choices[0].message.content)
+# All logs
+cat server.log
 ```
 
 ---
 
-## 📝 Notes
+## 💡 Tips & Best Practices
 
-- All scripts are **idempotent** - safe to run multiple times
-- Server logs are written to `server.log`
-- Token validation is **non-fatal** - continues with warnings
-- Results are timestamped and never overwritten
+### 1. Use Anonymous Mode for Testing
+
+No need to configure tokens for quick tests:
+
+```bash
+# Don't set ZAI_TOKEN - just run
+bash scripts/all.sh
+```
+
+### 2. Configure Port for Multiple Instances
+
+```bash
+export SERVER_PORT=7555
+bash scripts/all.sh
+```
+
+### 3. Enable FlareProx for Production
+
+```bash
+export ENABLE_FLAREPROX=true
+export CLOUDFLARE_API_TOKEN=your_token
+export CLOUDFLARE_ACCOUNT_ID=your_id
+bash scripts/setup.sh
+```
+
+### 4. Check Server Status
+
+```bash
+curl http://localhost:8080/health
+```
+
+### 5. Stop Server Cleanly
+
+```bash
+kill $(cat .server.pid)
+```
 
 ---
 
-## 🎉 That's It!
+## 🎯 What Each Script Does NOT Do
 
-You now have a complete, automated workflow for:
-- Setting up your environment
-- Starting the OpenAI-compatible API server
-- Sending requests and getting responses
-- All with comprehensive validation and health checks!
+To keep scripts simple and focused:
 
-**Happy coding!** 🚀
+- **setup.sh** - Doesn't start the server
+- **start.sh** - Doesn't install dependencies
+- **send_request.sh** - Doesn't start the server
+- **all.sh** - Just orchestrates the other three
+
+**Design Philosophy:** Each script does one thing well, `all.sh` combines them.
+
+---
+
+## 📚 Related Documentation
+
+- [Complete Documentation](../DOCUMENTATION.md) - Full guide
+- [README](../README.md) - Project overview
+- [Environment Template](../env_template.txt) - Configuration reference
+
+---
+
+## 🔄 Migration from Old Scripts
+
+If you used the old script structure (10 scripts), everything is now consolidated:
+
+| Old Script | New Location |
+|------------|--------------|
+| `fetch_token.sh` | Integrated into `setup.sh` |
+| `get_token_from_browser.sh` | Integrated into `setup.sh` |
+| `deploy_zai_api_server.sh` | Integrated into `setup.sh` |
+| `integrate_flareprox.sh` | Integrated into `setup.sh` |
+| `validate_scripts.sh` | Tests in `send_request.sh` |
+
+**Same functionality, simpler structure.** 🎉
+
+---
+
+## ✨ Summary
+
+**Four scripts. That's all you need.**
+
+1. `setup.sh` - Get ready
+2. `start.sh` - Run server
+3. `send_request.sh` - Validate
+4. `all.sh` - Do everything
+
+**Simple. Clean. Effective.**
+
+---
+
+**Made with ❤️ by the Zeeeepa team**
+

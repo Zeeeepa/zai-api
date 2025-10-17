@@ -60,7 +60,7 @@ class FlareProxManager:
     def __init__(self):
         self.api_token = settings.CLOUDFLARE_API_TOKEN
         self.account_id = settings.CLOUDFLARE_ACCOUNT_ID
-        self.enabled = bool(self.api_token and self.account_id)
+        self.enabled = settings.ENABLE_FLAREPROX and bool(self.api_token and self.account_id)
         
         self.workers: List[FlareProxWorker] = []
         self.min_workers = 2  # Minimum number of workers to maintain

@@ -179,7 +179,11 @@ class TokenPool:
                             return token
                     else:
                         last_status_code = response.status_code
-                        error_log(f"[WARN] 获取匿名Token失败，状态码: {response.status_code}")
+                        try:
+                            error_body = response.text
+                            error_log(f"[WARN] 获取匿名Token失败，状态码: {response.status_code}, 响应: {error_body[:200]}")
+                        except:
+                            error_log(f"[WARN] 获取匿名Token失败，状态码: {response.status_code}")
                         
                 finally:
                     # 如果是临时创建的客户端，需要关闭

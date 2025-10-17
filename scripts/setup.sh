@@ -100,6 +100,28 @@ if [ ! -f .env ]; then
     if [ -f env_template.txt ]; then
         cp env_template.txt .env
         print_status "$GREEN" "✅ Created .env from template"
+        
+        # Substitute SERVER_PORT if set
+        if [ -n "$SERVER_PORT" ]; then
+            sed -i "s/^LISTEN_PORT=.*/LISTEN_PORT=$SERVER_PORT/" .env
+            print_status "$GREEN" "✅ Set LISTEN_PORT=$SERVER_PORT in .env"
+        fi
+        
+        # Substitute CLOUDFLARE credentials if set
+        if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            sed -i "s|^# CLOUDFLARE_API_TOKEN=.*|CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN|" .env
+            print_status "$GREEN" "✅ Set CLOUDFLARE_API_TOKEN in .env"
+        fi
+        
+        if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            sed -i "s|^# CLOUDFLARE_ACCOUNT_ID=.*|CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID|" .env
+            print_status "$GREEN" "✅ Set CLOUDFLARE_ACCOUNT_ID in .env"
+        fi
+        
+        if [ -n "$ENABLE_FLAREPROX" ]; then
+            sed -i "s/^ENABLE_FLAREPROX=.*/ENABLE_FLAREPROX=$ENABLE_FLAREPROX/" .env
+            print_status "$GREEN" "✅ Set ENABLE_FLAREPROX=$ENABLE_FLAREPROX in .env"
+        fi
     else
         print_status "$RED" "❌ env_template.txt not found"
         exit 1
@@ -151,16 +173,36 @@ else
     print_status "$GREEN" "✅ OpenAI SDK installed"
 fi
 
+# Step 4.5: Initialize browserforge (download model files)
+echo ""
+echo -e "${BLUE}Step 4.5/7: Initializing browserforge...${NC}"
+if python3 -c "from browserforge.headers import HeaderGenerator; hg = HeaderGenerator()" 2>&1 | grep -q "Downloading"; then
+    print_status "$GREEN" "✅ Browserforge initialized successfully"
+else
+    # Try to import - this will trigger download if needed
+    if python3 -c "from browserforge.headers import HeaderGenerator; HeaderGenerator()" 2>/dev/null; then
+        print_status "$GREEN" "✅ Browserforge ready"
+    else
+        print_status "$YELLOW" "⚠️  Browserforge initialization had warnings (may still work)"
+    fi
+fi
+
 # Step 5: Check configuration
 echo ""
 echo -e "${BLUE}Step 5/7: Checking configuration...${NC}"
 source .env
-if [ -n "$AUTH_TOKEN" ] && [ -n "$API_ENDPOINT" ]; then
-    print_status "$GREEN" "✅ AUTH_TOKEN configured"
+if [ -n "$API_ENDPOINT" ]; then
     print_status "$GREEN" "✅ API_ENDPOINT configured: ${API_ENDPOINT}"
 else
-    print_status "$RED" "❌ Configuration incomplete in .env"
+    print_status "$RED" "❌ API_ENDPOINT missing in .env"
     exit 1
+fi
+
+# AUTH_TOKEN is optional - guest mode will be used if not provided
+if [ -n "$AUTH_TOKEN" ]; then
+    print_status "$GREEN" "✅ AUTH_TOKEN configured (authenticated mode)"
+else
+    print_status "$YELLOW" "⚠️  No AUTH_TOKEN - using guest mode"
 fi
 
 # Step 6: Create test_results directory

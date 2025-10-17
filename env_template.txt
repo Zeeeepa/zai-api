@@ -7,8 +7,11 @@ API_ENDPOINT=https://chat.z.ai/api/chat/completions
 # Z.AI Token (OPTIONAL - will use anonymous token if not provided)
 # ZAI_TOKEN=your_zai_token_here
 
-# Z.AI Signing Secret
+# Z.AI 签名密钥（用于API请求签名，默认值：junjie），请勿修改
 ZAI_SIGNING_SECRET=junjie
+
+# Z.AI 前端版本号（用于API请求头，默认值：prod-fe-1.0.99）
+ZAI_FE_VERSION=prod-fe-1.0.99
 
 # ================================================================
 # Server Configuration
@@ -30,8 +33,9 @@ SKIP_AUTH_TOKEN=false
 ENABLE_FLAREPROX=false
 
 # Cloudflare API credentials (required if ENABLE_FLAREPROX=true)
-# CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
-# CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+# Get your API token from: https://dash.cloudflare.com/profile/api-tokens
+# CLOUDFLARE_API_TOKEN=
+# CLOUDFLARE_ACCOUNT_ID=
 
 # ================================================================
 # Anonymous Token Configuration
@@ -44,6 +48,11 @@ GUEST_TOKEN_CACHE_MINUTES=30
 
 # Z.AI authentication endpoint
 ZAI_AUTH_ENDPOINT=https://chat.z.ai/api/v1/auths/
+
+# Z.AI Account Credentials (OPTIONAL - for authenticated token generation)
+# Only needed if you want to use account-based authentication instead of guest tokens
+# ZAI_EMAIL=
+# ZAI_PASSWORD=
 
 # ================================================================
 # Model Configuration

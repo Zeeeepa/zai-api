@@ -461,3 +461,7 @@ async def get_flareprox_manager() -> FlareProxManager:
         await _flareprox_manager.initialize()
     
     return _flareprox_manager
+
+
+# Create singleton instance for synchronous access
+flareprox_manager = FlareProxManager()
